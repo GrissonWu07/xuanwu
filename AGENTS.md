@@ -58,8 +58,14 @@ Before making any feature changes, bug fixes, or architectural decisions, consul
 | **Architecture** | Design philosophy, system architecture, bootstrap sequence, request lifecycle, security model, extension points | [docs/architecture.md](docs/architecture.md) |
 | **Module Details** | Per-module API surface, class/method/enum reference, configuration options, dependencies | [docs/module-details.md](docs/module-details.md) |
 | **Development Spec** | Code style, architecture patterns, error handling, security, testing, extension development, deployment & operations, review checklist | [docs/development-spec.md](docs/development-spec.md) |
+| **Project Workflow** | Required read order, task lifecycle, write-back rules, and done definition | [docs/project/WORKFLOW.md](docs/project/WORKFLOW.md) |
+| **Current State** | Current architectural baseline, active conventions, and recent globally relevant capabilities | [docs/project/state/CURRENT_STATE.md](docs/project/state/CURRENT_STATE.md) |
+| **Known Gaps** | Active missing capabilities, risks, and follow-up areas | [docs/project/state/KNOWN_GAPS.md](docs/project/state/KNOWN_GAPS.md) |
 
 **All development work MUST be consistent with these documents.** If a proposed change conflicts with documented patterns, update the documentation as part of the same change.
+
+If a task already exists under `docs/project/tasks/`, read its related
+`design.md`, `plan.md`, and `status.md` files before continuing implementation.
 
 ### Additional References
 
