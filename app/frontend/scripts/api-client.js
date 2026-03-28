@@ -203,6 +203,24 @@ export async function resetSession(sessionKey, archive = true) {
 }
 
 /**
+ * Delete a session
+ * @param {string} sessionKey - Session key
+ * @returns {Promise<object>} Result
+ */
+export async function deleteSession(sessionKey) {
+    const response = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionKey)}`), {
+        method: 'DELETE',
+        credentials: 'include'
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to delete session: ${response.status}`);
+    }
+
+    return response.json();
+}
+
+/**
  * Start agent run
  * @param {string} sessionKey - Session key
  * @param {string} message - User message
@@ -272,6 +290,7 @@ export default {
     listSessionAttachments,
     uploadSessionAttachment,
     resetSession,
+    deleteSession,
     startAgentRun,
     getAgentStatus,
     abortAgentRun

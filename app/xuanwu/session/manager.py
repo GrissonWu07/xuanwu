@@ -465,6 +465,21 @@ manager = SessionManager(agents_dir="/path/to/legacy-agents")
         session.context_tokens = context_tokens
         session.updated_at = datetime.now()
         await self._save_metadata()
+
+    async def update_title(
+        self,
+        session_key: str,
+        *,
+        title: str,
+        title_status: str,
+    ) -> None:
+        """Persist session title metadata."""
+        session = await self.get_or_create(session_key)
+        normalized_title = (title or "").strip()
+        session.title = normalized_title
+        session.title_status = title_status
+        session.updated_at = datetime.now()
+        await self._save_metadata()
     
     async def mark_compacted(self, session_key: str) -> None:
         """Record that transcript compaction has completed for a session."""
