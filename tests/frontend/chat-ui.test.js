@@ -83,7 +83,9 @@ function createChatElement() {
     return {
         handler: null,
         introMessage: null,
-        textInput: null
+        textInput: null,
+        addMessage: jest.fn(),
+        getMessages: jest.fn(() => [])
     };
 }
 
@@ -103,6 +105,8 @@ describe('chat-ui.js handler mode', () => {
         await initChat(element);
 
         expect(typeof element.handler).toBe('function');
+        expect(element.auxiliaryStyle).not.toContain('#text-input-container { border: none !important; background: transparent !important; box-shadow: none !important; }');
+        expect(element.auxiliaryStyle).not.toContain('#input { background: transparent !important; }');
     });
 
     test('initChat restores persisted session history for active session', async () => {
@@ -316,5 +320,77 @@ describe('chat-ui.js handler mode', () => {
                 body: expect.stringContaining('from messages array')
             })
         );
+    });
+
+    test('handler does not manually append a second user message while stream is running', async () => {
+        const { initChat } = await import('../../app/frontend/scripts/chat-ui.js');
+        const element = createChatElement();
+        const signals = createMockSignals();
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ session_key: 'session-123' })
+        }).mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({})
+        });
+
+        await initChat(element);
+        global.fetch.mockClear();
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ run_id: 'run-optimistic' })
+        });
+
+        const handlerPromise = element.handler(
+            { messages: [{ text: 'show immediately', role: 'user' }] },
+            signals
+        );
+
+        await new Promise(r => setTimeout(r, 120));
+
+        expect(element.addMessage).not.toHaveBeenCalled();
+
+        MockEventSource.instances[0].simulateEvent('lifecycle', { phase: 'end' });
+        await handlerPromise;
+    });
+
+    test('handler does not append optimistic user message when deep-chat already rendered it', async () => {
+        const { initChat } = await import('../../app/frontend/scripts/chat-ui.js');
+        const element = createChatElement();
+        const signals = createMockSignals();
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ session_key: 'session-123' })
+        }).mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({})
+        });
+
+        await initChat(element);
+        global.fetch.mockClear();
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ run_id: 'run-no-dup' })
+        });
+
+        element.getMessages.mockImplementation(() => ([
+            { role: 'user', text: '你好' }
+        ]));
+
+        const handlerPromise = element.handler(
+            { messages: [{ text: '你好', role: 'user' }] },
+            signals
+        );
+
+        await new Promise(r => setTimeout(r, 120));
+
+        expect(element.addMessage).not.toHaveBeenCalled();
+
+        MockEventSource.instances[0].simulateEvent('lifecycle', { phase: 'end' });
+        await handlerPromise;
     });
 });

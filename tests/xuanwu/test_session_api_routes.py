@@ -42,6 +42,8 @@ def test_session_routes_use_current_session_manager_interface(tmp_path):
     create_response = client.post("/api/sessions", json={})
     assert create_response.status_code == 200
     session_key = create_response.json()["session_key"]
+    assert create_response.json()["title"] == ""
+    assert create_response.json()["title_status"] == "empty"
     encoded_session_key = quote(session_key, safe="")
 
     get_response = client.get(f"/api/sessions/{encoded_session_key}")

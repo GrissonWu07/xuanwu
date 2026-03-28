@@ -105,7 +105,7 @@ export async function initApp() {
     }
 
     if (headerContainer) {
-      renderHeader(headerContainer)
+      renderHeader(headerContainer, { authInfo })
       if (currentAgentInfo?.name) {
         updateHeaderTitleText(currentAgentInfo.name)
       }

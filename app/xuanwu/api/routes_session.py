@@ -80,6 +80,8 @@ def _build_session_response(session_key: str, session: Any) -> SessionResponse:
         last_activity=session.updated_at,
         message_count=getattr(session, "message_count", 0),
         total_tokens=session.total_tokens,
+        title=getattr(session, "title", "") or "",
+        title_status=getattr(session, "title_status", "empty") or "empty",
     )
 
 

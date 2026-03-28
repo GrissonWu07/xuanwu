@@ -38,6 +38,8 @@ class SessionResponse(BaseModel):
     last_activity: datetime
     message_count: int
     total_tokens: int
+    title: str = ""
+    title_status: str = "empty"
 
 
 class SessionHistoryMessage(BaseModel):

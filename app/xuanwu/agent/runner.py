@@ -32,6 +32,7 @@ from app.xuanwu.agent.runner_prompt_context import (
     collect_md_skills_snapshot,
 )
 from app.xuanwu.agent.runtime_events import RuntimeEventDispatcher
+from app.xuanwu.agent.session_titles import SessionTitleGenerator
 from app.xuanwu.agent.thinking_stream import ThinkingStreamEmitter
 from app.xuanwu.session.context import SessionKey
 
@@ -92,6 +93,7 @@ class AgentRunner:
         self.agent_factory = agent_factory
         self.history = HistoryMemoryCoordinator(session_manager_router or self.sessions, self.compaction)
         self.runtime_events = RuntimeEventDispatcher(self.hooks, self.queue)
+        self.title_generator = SessionTitleGenerator()
 
     
     async def run(
@@ -129,6 +131,13 @@ class AgentRunner:
             transcript = await session_manager.load_transcript(session_key)
             message_history = self.history.build_message_history(transcript)
             message_history = self.history.prune_summary_messages(message_history)
+            await self._maybe_set_draft_title(
+                session_manager=session_manager,
+                session_key=session_key,
+                session=session,
+                transcript=transcript,
+                user_message=user_message,
+            )
 
             system_prompt = build_system_prompt(
                 self.prompt_builder,
@@ -385,6 +394,13 @@ class AgentRunner:
                             thinking_emitter.assistant_emitted = True
                             yield StreamEvent.assistant_delta(final_assistant)
                     await session_manager.persist_transcript(session_key, final_messages)
+                    await self._maybe_finalize_title(
+                        session_manager=session_manager,
+                        session_key=session_key,
+                        session=session,
+                        final_messages=final_messages,
+                        user_message=user_message,
+                    )
 
             except Exception as e:
                 # Close thinking phase on exception to maintain contract
@@ -491,6 +507,62 @@ class AgentRunner:
         if self.session_manager_router is not None:
             return self.session_manager_router.for_session_key(session_key)
         return self.sessions
+
+    async def _maybe_set_draft_title(
+        self,
+        *,
+        session_manager: Any,
+        session_key: str,
+        session: Any,
+        transcript: list[Any],
+        user_message: str,
+    ) -> None:
+        """Create a draft title for brand-new chat threads."""
+        if getattr(session, "title_status", "empty") not in {"", "empty"}:
+            return
+        if transcript:
+            return
+        draft_title = self.title_generator.build_draft_title(user_message)
+        await session_manager.update_title(
+            session_key,
+            title=draft_title,
+            title_status="draft",
+        )
+        session.title = draft_title
+        session.title_status = "draft"
+
+    async def _maybe_finalize_title(
+        self,
+        *,
+        session_manager: Any,
+        session_key: str,
+        session: Any,
+        final_messages: list[dict],
+        user_message: str,
+    ) -> None:
+        """Promote a draft title to a stable final title after the first assistant reply."""
+        if getattr(session, "title_status", "empty") == "final":
+            return
+        assistant_message = next(
+            (
+                msg.get("content", "")
+                for msg in final_messages
+                if msg.get("role") == "assistant" and msg.get("content")
+            ),
+            "",
+        )
+        final_title = self.title_generator.build_final_title(
+            first_user_message=user_message,
+            first_assistant_message=assistant_message,
+            existing_title=getattr(session, "title", ""),
+        )
+        await session_manager.update_title(
+            session_key,
+            title=final_title,
+            title_status="final",
+        )
+        session.title = final_title
+        session.title_status = "final"
 
     @asynccontextmanager
 
