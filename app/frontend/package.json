@@ -15,8 +15,9 @@
   },
   "jest": {
     "testEnvironment": "jsdom",
-    "rootDir": "../..",
-    "testMatch": ["<rootDir>/tests/frontend/**/*.test.js"],
+    "rootDir": ".",
+    "roots": ["<rootDir>/../../tests/frontend"],
+    "testMatch": ["**/*.test.js"],
     "moduleFileExtensions": ["js"],
     "transform": {}
   }

@@ -50,6 +50,28 @@ class SessionHistoryResponse(BaseModel):
     messages: list[SessionHistoryMessage] = Field(default_factory=list)
 
 
+class SessionAttachmentEntry(BaseModel):
+    entry_id: str
+    filename: str
+    batch_id: str
+    relative_path: str
+    size_bytes: int = 0
+    content_type: Optional[str] = None
+    injection_mode: Optional[str] = None
+    status: Optional[str] = None
+    created_at: str
+    download_url: str
+
+
+class SessionAttachmentsResponse(BaseModel):
+    uploads: list[SessionAttachmentEntry] = Field(default_factory=list)
+    artifacts: list[SessionAttachmentEntry] = Field(default_factory=list)
+
+
+class SessionAttachmentUploadResponse(BaseModel):
+    upload: SessionAttachmentEntry
+
+
 class SessionResetRequest(BaseModel):
     archive: bool = True
 

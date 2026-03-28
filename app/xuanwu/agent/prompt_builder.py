@@ -112,6 +112,7 @@ class PromptBuilder:
         target_md_skill: Optional[dict] = None,
         user_info: Optional["UserInfo"] = None,
         provider_contexts: Optional[dict[str, dict]] = None,
+        attachment_context: Optional[dict[str, list[dict]]] = None,
     ) -> str:
         """
         Build the full system prompt for the current run.
@@ -163,6 +164,9 @@ class PromptBuilder:
             
             # 5. Self-update instructions
             parts.append(self._build_self_update())
+
+            if attachment_context:
+                parts.append(self._build_attachment_context(attachment_context))
             
             # 6. Workspace context
             parts.append(self._build_workspace_info())
@@ -224,6 +228,9 @@ class PromptBuilder:
     
     def _build_self_update(self) -> str:
         return prompt_sections.build_self_update()
+
+    def _build_attachment_context(self, attachment_context: dict[str, list[dict]]) -> str:
+        return prompt_sections.build_attachment_context(attachment_context)
     
     def _build_workspace_info(self) -> str:
         return prompt_sections.build_workspace_info(self.config)

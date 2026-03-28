@@ -3,20 +3,40 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Optional
 
 
 def build_system_prompt(prompt_builder, session: Any, deps, *, agent: Optional[Any] = None) -> str:
     """Build the runtime system prompt for the current session."""
+    build_kwargs = {
+        "session": session,
+        "skills": collect_skills_snapshot(deps),
+        "tools": collect_tools_snapshot(agent=agent),
+        "md_skills": collect_md_skills_snapshot(deps),
+        "target_md_skill": collect_target_md_skill(deps),
+        "user_info": deps.user_info,
+        "provider_contexts": collect_provider_contexts(deps),
+    }
+    attachment_context = collect_attachment_context(deps)
+    if attachment_context is not None and _supports_attachment_context(prompt_builder):
+        build_kwargs["attachment_context"] = attachment_context
+
     return prompt_builder.build(
-        session=session,
-        skills=collect_skills_snapshot(deps),
-        tools=collect_tools_snapshot(agent=agent),
-        md_skills=collect_md_skills_snapshot(deps),
-        target_md_skill=collect_target_md_skill(deps),
-        user_info=deps.user_info,
-        provider_contexts=collect_provider_contexts(deps),
+        **build_kwargs,
     )
+
+
+def _supports_attachment_context(prompt_builder: Any) -> bool:
+    """Return whether the prompt builder accepts `attachment_context`."""
+    build_fn = getattr(prompt_builder, "build", None)
+    if build_fn is None:
+        return False
+    try:
+        signature = inspect.signature(build_fn)
+    except (TypeError, ValueError):
+        return False
+    return "attachment_context" in signature.parameters
 
 
 def collect_skills_snapshot(deps) -> list[dict]:
@@ -75,6 +95,13 @@ def collect_provider_contexts(deps) -> dict[str, dict]:
         return result
     except Exception:
         return {}
+
+
+def collect_attachment_context(deps) -> Optional[dict]:
+    """Read thread attachment context from `deps.extra` if present."""
+    extra = deps.extra if isinstance(deps.extra, dict) else {}
+    value = extra.get("attachment_context")
+    return value if isinstance(value, dict) else None
 
 
 def collect_tools_snapshot(*, agent: Any) -> list[dict]:

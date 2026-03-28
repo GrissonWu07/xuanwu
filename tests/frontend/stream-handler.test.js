@@ -65,6 +65,7 @@ describe('stream-handler.js', () => {
             expect(EventTypes.LIFECYCLE).toBe('lifecycle');
             expect(EventTypes.ASSISTANT).toBe('assistant');
             expect(EventTypes.TOOL).toBe('tool');
+            expect(EventTypes.ARTIFACT).toBe('artifact');
             expect(EventTypes.ERROR).toBe('error');
             expect(EventTypes.HEARTBEAT).toBe('heartbeat');
         });
@@ -154,6 +155,27 @@ describe('stream-handler.js', () => {
             es.simulateEvent('tool', { tool: 'search', phase: 'end', result: 'done' });
             
             expect(onToolEnd).toHaveBeenCalledWith({ tool_name: 'search', result: 'done' });
+        });
+
+        test('should call onArtifact callback on artifact event', async () => {
+            const { createStreamHandler } = await import('../../app/frontend/scripts/stream-handler.js');
+
+            const onArtifact = jest.fn();
+            const handler = createStreamHandler('run-123', { onArtifact });
+            handler.start();
+
+            const es = MockEventSource.instances[0];
+            es.simulateEvent('artifact', {
+                artifact_id: 'artifact-1',
+                name: 'report.md',
+                download_url: '/api/download/report.md'
+            });
+
+            expect(onArtifact).toHaveBeenCalledWith({
+                artifact_id: 'artifact-1',
+                name: 'report.md',
+                download_url: '/api/download/report.md'
+            });
         });
 
         test('should call onEnd callback and close on lifecycle end event', async () => {
