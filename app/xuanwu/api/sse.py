@@ -28,6 +28,7 @@ class SSEEventType(Enum):
     ERROR = "error"
     HEARTBEAT = "heartbeat"
     THINKING = "thinking"
+    ARTIFACT = "artifact"
 
 
 @dataclass
@@ -507,6 +508,26 @@ tool
         return self.push_event(run_id, SSEEvent(
             event_type=SSEEventType.THINKING,
             data=data
+        ))
+
+    def push_artifact(
+        self,
+        run_id: str,
+        *,
+        artifact_id: str,
+        name: str,
+        relative_path: str,
+        download_url: str,
+    ) -> int:
+        """Push a generated artifact event."""
+        return self.push_event(run_id, SSEEvent(
+            event_type=SSEEventType.ARTIFACT,
+            data={
+                "artifact_id": artifact_id,
+                "name": name,
+                "relative_path": relative_path,
+                "download_url": download_url,
+            },
         ))
         
     def get_active_streams(self) -> list[str]:

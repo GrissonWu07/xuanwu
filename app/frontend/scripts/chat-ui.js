@@ -342,7 +342,23 @@ async function notifyRunCompleted(sessionKey) {
   notifyConversationState(hasHistory)
 }
 
-function buildMessageText(thinkingContent, responseContent, elapsedSeconds = null, isThinking = false) {
+function buildArtifactLinks(artifactLinks = []) {
+  if (!artifactLinks.length) return ''
+  const links = artifactLinks.map((item) => {
+    const href = escapeHtml(item.download_url || '#')
+    const name = escapeHtml(item.name || 'artifact')
+    return `<a class="artifact-link" href="${href}" target="_blank" rel="noreferrer">${name}</a>`
+  }).join('')
+  return `<div class="artifact-links"><div class="artifact-links-label">Outputs</div><div class="artifact-links-list">${links}</div></div>`
+}
+
+function buildMessageText(
+  thinkingContent,
+  responseContent,
+  elapsedSeconds = null,
+  isThinking = false,
+  artifactLinks = []
+) {
   if (thinkingContent) {
     let html = ''
     if (isThinking) {
@@ -352,18 +368,34 @@ function buildMessageText(thinkingContent, responseContent, elapsedSeconds = nul
 
     html += `<details class="thinking-block"><summary><span class="thinking-icon">?</span><span class="thinking-label">Thought process</span>${elapsedSeconds !== null ? `<span class="thinking-timer">${elapsedSeconds}s</span>` : ''}<span class="thinking-toggle">?</span></summary><div class="thinking-body"><div class="thinking-content-text">${escapeHtml(thinkingContent)}</div></div></details>`
     if (responseContent) {
-      return { html, text: responseContent }
+      return { html, text: responseContent, artifactsHtml: buildArtifactLinks(artifactLinks) }
     }
     return { html }
   }
 
-  return { html: `<div class="response-content">${escapeHtml(responseContent || '')}</div>` }
+  return {
+    html: `<div class="response-content">${escapeHtml(responseContent || '')}</div>${buildArtifactLinks(artifactLinks)}`
+  }
 }
 
-function buildMessageContent(thinkingContent, responseContent, elapsedSeconds = null, isThinking = false) {
-  const result = buildMessageText(thinkingContent, responseContent, elapsedSeconds, isThinking)
+function buildMessageContent(
+  thinkingContent,
+  responseContent,
+  elapsedSeconds = null,
+  isThinking = false,
+  artifactLinks = []
+) {
+  const result = buildMessageText(
+    thinkingContent,
+    responseContent,
+    elapsedSeconds,
+    isThinking,
+    artifactLinks
+  )
   if (result.html && result.text) {
-    return { html: `<div class="message-wrapper">${result.html}<div class="response-content">${escapeHtml(result.text)}</div></div>` }
+    return {
+      html: `<div class="message-wrapper">${result.html}<div class="response-content">${escapeHtml(result.text)}</div>${result.artifactsHtml || ''}</div>`
+    }
   }
   if (result.text !== undefined && !result.html) {
     return { html: `<div class="response-content">${escapeHtml(result.text)}</div>` }
@@ -394,6 +426,7 @@ async function handleStreamWithSignals(runId, signals, context) {
   let thinkingTimerInterval = null
   let thinkingFinalized = false
   let hasThinkingContent = false
+  const artifactLinks = []
 
   function updateUI() {
     try {
@@ -401,7 +434,8 @@ async function handleStreamWithSignals(runId, signals, context) {
         thinkingContent,
         aiMessageContent,
         thinkingElapsedSeconds,
-        !thinkingFinalized && hasThinkingContent
+        !thinkingFinalized && hasThinkingContent,
+        artifactLinks
       )
       if (content.html) {
         signals.onResponse({ html: content.html, overwrite: true })
@@ -468,6 +502,10 @@ async function handleStreamWithSignals(runId, signals, context) {
       },
       onToolStart: () => {},
       onToolEnd: () => {},
+      onArtifact: (artifact) => {
+        artifactLinks.push(artifact)
+        updateUI()
+      },
       onThinkingStart: () => {
         hasThinkingContent = true
         startThinkingTimer()

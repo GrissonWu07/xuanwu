@@ -4,7 +4,7 @@
 
 import { initSession, getSessionKey, setSessionKey } from '../session-manager.js'
 import { initChat, activateSession, abortCurrentStream, getCurrentAgentInfo } from '../chat-ui.js'
-import { listSessions, deleteSession } from '../api-client.js'
+import { listSessions, deleteSession, listSessionAttachments, uploadSessionAttachment } from '../api-client.js'
 import { t } from '../i18n.js'
 import { updateHeaderTitleText } from '../components/header.js'
 
@@ -15,6 +15,7 @@ let sessionsCache = []
 let searchQuery = ''
 let pageContainer = null
 let currentAgentName = 'AtlasClaw'
+let attachmentsCache = { uploads: [], artifacts: [] }
 
 export async function mount(container) {
   pageContainer = container
@@ -34,6 +35,13 @@ export async function mount(container) {
             style="width: 100%; height: 100%; display: flex; flex-direction: column;"
             textMarkdown="true">
           </deep-chat>
+        </div>
+        <div id="chat-attachment-strip" class="chat-attachment-strip">
+          <div class="chat-attachment-bar">
+            <button id="chat-attachment-upload-btn" class="chat-attachment-upload-btn" type="button">Attach</button>
+            <input id="chat-attachment-input" type="file" hidden />
+            <div id="chat-attachment-content" class="chat-attachment-content"></div>
+          </div>
         </div>
       </div>
       <div id="confirmDialog" class="confirm-dialog hidden">
@@ -67,7 +75,9 @@ export async function mount(container) {
 
   currentAgentName = getCurrentAgentInfo()?.name || currentAgentName
   await loadSessions()
+  await loadAttachments()
   bindDialogEvents(container)
+  bindAttachmentEvents(container)
   mounted = true
 }
 
@@ -79,6 +89,7 @@ export async function unmount() {
   chatElement = null
   currentSessionKey = null
   sessionsCache = []
+  attachmentsCache = { uploads: [], artifacts: [] }
   searchQuery = ''
   mounted = false
 }
@@ -97,6 +108,22 @@ async function loadSessions() {
   ensureActiveSessionEntry()
   renderSidebarContent(sidebarContent)
   syncHeaderTitle()
+}
+
+async function loadAttachments() {
+  if (!currentSessionKey || !pageContainer) {
+    attachmentsCache = { uploads: [], artifacts: [] }
+    renderAttachmentStrip()
+    return
+  }
+
+  try {
+    attachmentsCache = await listSessionAttachments(currentSessionKey)
+  } catch (error) {
+    console.error('[ChatPage] Failed to load attachments:', error)
+    attachmentsCache = { uploads: [], artifacts: [] }
+  }
+  renderAttachmentStrip()
 }
 
 function ensureActiveSessionEntry() {
@@ -167,6 +194,7 @@ async function handleSessionClick(event) {
   setSessionKey(nextKey)
   currentSessionKey = nextKey
   await activateSession(nextKey)
+  await loadAttachments()
   renderSidebarContent(document.getElementById('sidebar-dynamic-content'))
   syncHeaderTitle()
 }
@@ -186,6 +214,7 @@ function handleUserTurnStarted({ sessionKey, messageText }) {
 
 async function handleRunCompleted() {
   await loadSessions()
+  await loadAttachments()
 }
 
 function handleConversationStateChange({ hasMessages, agentInfo }) {
@@ -238,6 +267,54 @@ function bindDialogEvents(container) {
   }
 }
 
+function bindAttachmentEvents(container) {
+  const uploadButton = container.querySelector('#chat-attachment-upload-btn')
+  const fileInput = container.querySelector('#chat-attachment-input')
+  if (!uploadButton || !fileInput) return
+
+  uploadButton.addEventListener('click', () => {
+    fileInput.click()
+  })
+
+  fileInput.addEventListener('change', async (event) => {
+    const selectedFile = event.target.files?.[0]
+    if (!selectedFile || !currentSessionKey) return
+    try {
+      await uploadSessionAttachment(currentSessionKey, selectedFile)
+      await loadAttachments()
+    } catch (error) {
+      console.error('[ChatPage] Failed to upload attachment:', error)
+    } finally {
+      event.target.value = ''
+    }
+  })
+}
+
+function renderAttachmentStrip() {
+  const container = pageContainer?.querySelector('#chat-attachment-content')
+  if (!container) return
+
+  const uploadItems = (attachmentsCache.uploads || []).map((item) => {
+    const mode = item.injection_mode ? `<span class="attachment-chip-meta">${escapeHtml(item.injection_mode)}</span>` : ''
+    return `<a class="attachment-chip" href="${escapeHtml(item.download_url)}" target="_blank" rel="noreferrer">${escapeHtml(item.filename)}${mode}</a>`
+  }).join('')
+
+  const artifactItems = (attachmentsCache.artifacts || []).map((item) => {
+    return `<a class="attachment-chip attachment-chip-output" href="${escapeHtml(item.download_url)}" target="_blank" rel="noreferrer">${escapeHtml(item.filename)}</a>`
+  }).join('')
+
+  container.innerHTML = `
+    <div class="attachment-strip-group">
+      <span class="attachment-strip-label">Attachments</span>
+      <div class="attachment-strip-items">${uploadItems || '<span class="attachment-strip-empty">None</span>'}</div>
+    </div>
+    <div class="attachment-strip-group">
+      <span class="attachment-strip-label">Outputs</span>
+      <div class="attachment-strip-items">${artifactItems || '<span class="attachment-strip-empty">None</span>'}</div>
+    </div>
+  `
+}
+
 function handleDeleteSessionClick(event) {
   event.stopPropagation()
   const sessionKey = event.currentTarget.getAttribute('data-delete-session')
@@ -275,6 +352,7 @@ async function deleteCurrentSession(sessionKey) {
       currentSessionKey = nextSession?.session_key || null
       setSessionKey(currentSessionKey)
       await activateSession(currentSessionKey)
+      await loadAttachments()
     }
     renderSidebarContent(document.getElementById('sidebar-dynamic-content'))
     syncHeaderTitle()

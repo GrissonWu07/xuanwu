@@ -19,6 +19,7 @@ export const EventTypes = {
     LIFECYCLE: 'lifecycle',
     ASSISTANT: 'assistant',
     TOOL: 'tool',
+    ARTIFACT: 'artifact',
     THINKING: 'thinking',
     ERROR: 'error',
     HEARTBEAT: 'heartbeat'
@@ -39,6 +40,7 @@ export function createStreamHandler(runId, callbacks = {}) {
         onDelta = () => {},
         onToolStart = () => {},
         onToolEnd = () => {},
+        onArtifact = () => {},
         onThinkingStart = () => {},
         onThinkingDelta = () => {},
         onThinkingEnd = () => {},
@@ -96,6 +98,16 @@ export function createStreamHandler(runId, callbacks = {}) {
             } else if (data.phase === 'end') {
                 onToolEnd({ tool_name: data.tool, result: data.result });
             }
+        });
+
+        eventSource.addEventListener(EventTypes.ARTIFACT, (e) => {
+            const data = parseEventData(e.data);
+            onArtifact({
+                artifact_id: data.artifact_id,
+                name: data.name,
+                download_url: data.download_url,
+                relative_path: data.relative_path
+            });
         });
 
         eventSource.addEventListener(EventTypes.ERROR, (e) => {

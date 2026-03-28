@@ -263,6 +263,36 @@ def build_self_update() -> str:
 To apply configuration changes, use the appropriate configuration commands."""
 
 
+def build_attachment_context(attachment_context: dict[str, list[dict]]) -> str:
+    """Build a lightweight attachment context section for the current thread."""
+    uploads = attachment_context.get("uploads", []) if isinstance(attachment_context, dict) else []
+    artifacts = attachment_context.get("artifacts", []) if isinstance(attachment_context, dict) else []
+    if not uploads and not artifacts:
+        return ""
+
+    lines = ["## Thread Attachments", ""]
+    if uploads:
+        lines.append("Uploads available in this thread:")
+        for upload in uploads[:10]:
+            filename = upload.get("filename", "unknown")
+            mode = upload.get("injection_mode", "reference")
+            relative_path = upload.get("relative_path", "")
+            lines.append(f"- {filename} [{mode}] -> {relative_path}")
+            content = str(upload.get("content") or "").strip()
+            if content:
+                lines.append(f"  Content: {content[:1200]}")
+        lines.append("")
+    if artifacts:
+        lines.append("Previously generated files:")
+        for artifact in artifacts[:10]:
+            name = artifact.get("name", "unknown")
+            relative_path = artifact.get("relative_path", "")
+            lines.append(f"- {name} -> {relative_path}")
+    lines.append("")
+    lines.append("Prefer using these files before asking the user to re-upload them.")
+    return "\n".join(lines)
+
+
 def build_workspace_info(config) -> str:
     """Build workspace section."""
     workspace = Path(config.workspace_path).expanduser()

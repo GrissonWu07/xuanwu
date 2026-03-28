@@ -6,12 +6,14 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
+from urllib.parse import quote
 
 from fastapi import HTTPException, status
 
 from ...auth.models import ANONYMOUS_USER, UserInfo
 from ...core.security_guard import encode_if_untrusted
 from ...session.context import SessionKey
+from ...thread_files.service import ThreadFileService
 from ..deps_context import APIContext, build_scoped_deps
 
 logger = logging.getLogger(__name__)
@@ -60,6 +62,17 @@ def abort_run(ctx: APIContext, run_id: str) -> None:
     run_info["status"] = "aborted"
 
 
+def _build_thread_file_service(ctx: APIContext, session_key: str, user_info: UserInfo) -> ThreadFileService:
+    manager = ctx.session_manager_router.for_user(user_info.user_id)
+    parsed = SessionKey.from_string(session_key)
+    thread_id = parsed.thread_id or "main"
+    return ThreadFileService(
+        workspace_path=str(manager.workspace_path),
+        user_id=user_info.user_id,
+        thread_id=thread_id,
+    )
+
+
 async def execute_agent_run(
     ctx: APIContext,
     run_id: str,
@@ -72,6 +85,9 @@ async def execute_agent_run(
     request_context: Optional[dict[str, Any]] = None,
 ) -> None:
     _user_info = user_info or ANONYMOUS_USER
+    thread_files = _build_thread_file_service(ctx, session_key, _user_info)
+    runtime_batch = await thread_files.create_runtime_batch()
+    runtime_snapshot = await thread_files.snapshot_runtime_files(runtime_batch.batch_id)
 
     try:
         target_agent_id = SessionKey.from_string(session_key).agent_id or "main"
@@ -95,8 +111,16 @@ async def execute_agent_run(
             extra={
                 "agent_id": target_agent_id,
                 "context": request_context or {},
+                "attachment_context": await thread_files.build_prompt_context_bundle(),
+                "attachment_batch_id": runtime_batch.batch_id,
+                "attachment_root": str(runtime_batch.root),
+                "attachment_uploads_dir": str(runtime_batch.uploads_dir),
+                "attachment_outputs_dir": str(runtime_batch.outputs_dir),
+                "attachment_workspace_dir": str(runtime_batch.workspace_dir),
             },
         )
+        deps.extra["user_work_dir"] = deps.extra.get("work_dir")
+        deps.extra["work_dir"] = str(runtime_batch.workspace_dir)
 
         async for event in runner.run(
             session_key=session_key,
@@ -146,5 +170,21 @@ async def execute_agent_run(
             ctx.active_runs[run_id]["error"] = error_msg
 
     finally:
+        try:
+            artifacts = await thread_files.finalize_runtime_artifacts(
+                runtime_batch.batch_id,
+                runtime_snapshot,
+            )
+            encoded_session_key = quote(session_key, safe="")
+            for artifact in artifacts:
+                ctx.sse_manager.push_artifact(
+                    run_id,
+                    artifact_id=artifact.artifact_id,
+                    name=artifact.name,
+                    relative_path=artifact.relative_path,
+                    download_url=f"/api/sessions/{encoded_session_key}/attachments/{artifact.artifact_id}/content",
+                )
+        except Exception as exc:
+            logger.warning("Failed to finalize runtime artifacts for %s: %s", run_id, exc)
         ctx.sse_manager.close_stream(run_id)
 

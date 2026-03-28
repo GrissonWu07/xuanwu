@@ -125,6 +125,41 @@ export async function getSessionHistory(sessionKey) {
     return response.json();
 }
 
+export async function listSessionAttachments(sessionKey) {
+    const response = await fetch(
+        buildApiUrl(`/api/sessions/${encodeURIComponent(sessionKey)}/attachments`),
+        {
+            credentials: 'include'
+        }
+    )
+
+    if (!response.ok) {
+        throw new Error(`Failed to list attachments: ${response.status}`)
+    }
+
+    return response.json()
+}
+
+export async function uploadSessionAttachment(sessionKey, file) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(
+        buildApiUrl(`/api/sessions/${encodeURIComponent(sessionKey)}/attachments`),
+        {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        }
+    )
+
+    if (!response.ok) {
+        throw new Error(`Failed to upload attachment: ${response.status}`)
+    }
+
+    return response.json()
+}
+
 /**
  * Reset session
  * @param {string} sessionKey - Session key
@@ -230,6 +265,8 @@ export default {
     createThreadSession,
     getSession,
     getSessionHistory,
+    listSessionAttachments,
+    uploadSessionAttachment,
     resetSession,
     deleteSession,
     startAgentRun,

@@ -7,6 +7,56 @@ beforeEach(() => {
   sessionStorage.clear()
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url)
+    if (target.endsWith('/api/sessions/session-a/attachments')) {
+      if (options.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            upload: {
+              entry_id: 'upload-1',
+              filename: 'brief.txt',
+              batch_id: '1711612345',
+              relative_path: '1711612345/uploads/upload-1-brief.txt',
+              size_bytes: 12,
+              content_type: 'text/plain',
+              injection_mode: 'full',
+              created_at: '2026-03-28T09:00:00Z',
+              download_url: '/api/sessions/session-a/attachments/upload-1/content'
+            }
+          })
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          uploads: [
+            {
+              entry_id: 'upload-1',
+              filename: 'brief.txt',
+              batch_id: '1711612345',
+              relative_path: '1711612345/uploads/upload-1-brief.txt',
+              size_bytes: 12,
+              content_type: 'text/plain',
+              injection_mode: 'full',
+              created_at: '2026-03-28T09:00:00Z',
+              download_url: '/api/sessions/session-a/attachments/upload-1/content'
+            }
+          ],
+          artifacts: [
+            {
+              entry_id: 'artifact-1',
+              filename: 'report.md',
+              batch_id: '1711612455',
+              relative_path: '1711612455/workspace/report.md',
+              size_bytes: 24,
+              status: 'ready',
+              created_at: '2026-03-28T09:05:00Z',
+              download_url: '/api/sessions/session-a/attachments/artifact-1/content'
+            }
+          ]
+        })
+      })
+    }
     if (target.endsWith('/api/sessions/threads')) {
       return Promise.resolve({
         ok: true,
@@ -73,6 +123,8 @@ describe('chat page', () => {
     expect(sidebar.textContent).toContain('Query approvals')
     expect(sidebar.textContent).toContain('Create virtual machine')
     expect(sidebar.textContent).not.toContain('Today')
+    expect(container.textContent).toContain('brief.txt')
+    expect(container.textContent).toContain('report.md')
 
     const searchInput = sidebar.querySelector('#session-search-input')
     searchInput.value = 'approvals'
@@ -119,5 +171,38 @@ describe('chat page', () => {
 
     expect(emptyState.classList.contains('hidden')).toBe(true)
     expect(container.classList.contains('chat-empty-mode')).toBe(false)
+  })
+
+  test('upload button posts files to the attachment endpoint', async () => {
+    const chatPage = await import('../../app/frontend/scripts/pages/chat.js')
+    const container = document.getElementById('page-root')
+
+    await chatPage.mount(container)
+
+    const uploadButton = container.querySelector('#chat-attachment-upload-btn')
+    const fileInput = container.querySelector('#chat-attachment-input')
+    expect(uploadButton).not.toBeNull()
+    expect(fileInput).not.toBeNull()
+
+    const clickSpy = jest.spyOn(fileInput, 'click').mockImplementation(() => {})
+    uploadButton.click()
+    expect(clickSpy).toHaveBeenCalled()
+
+    const file = new File(['hello world'], 'brief.txt', { type: 'text/plain' })
+    Object.defineProperty(fileInput, 'files', {
+      configurable: true,
+      value: [file]
+    })
+    fileInput.dispatchEvent(new Event('change'))
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/sessions\/session-a\/attachments$/),
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.any(FormData)
+      })
+    )
   })
 })

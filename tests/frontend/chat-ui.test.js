@@ -254,6 +254,55 @@ describe('chat-ui.js handler mode', () => {
         expect(signals.onClose).toHaveBeenCalled();
     });
 
+    test('handler renders artifact links into the streamed assistant response', async () => {
+        const { initChat } = await import('../../app/frontend/scripts/chat-ui.js');
+        const element = createChatElement();
+        const signals = createMockSignals();
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ session_key: 'session-123' })
+        }).mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({})
+        });
+
+        await initChat(element);
+        global.fetch.mockClear();
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ run_id: 'run-artifact' })
+        });
+
+        const handlerPromise = element.handler(
+            { messages: [{ text: 'build me a file', role: 'user' }] },
+            signals
+        );
+
+        await new Promise(r => setTimeout(r, 100));
+
+        const stream = MockEventSource.instances[0];
+        stream.simulateEvent('assistant', { text: 'Done', is_delta: true });
+        stream.simulateEvent('artifact', {
+            artifact_id: 'artifact-1',
+            name: 'report.md',
+            download_url: '/api/sessions/session-123/attachments/artifact-1/content'
+        });
+
+        await new Promise(r => setTimeout(r, 150));
+
+        expect(signals.onResponse).toHaveBeenCalledWith(
+            expect.objectContaining({
+                html: expect.stringContaining('report.md'),
+                overwrite: true
+            })
+        );
+
+        stream.simulateEvent('lifecycle', { phase: 'end' });
+        await handlerPromise;
+    });
+
     test('handler handles API error gracefully', async () => {
         const { initChat } = await import('../../app/frontend/scripts/chat-ui.js');
         const element = createChatElement();

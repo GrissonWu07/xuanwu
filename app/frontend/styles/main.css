@@ -277,6 +277,124 @@ body {
     min-height: 0;
 }
 
+.chat-attachment-strip {
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    bottom: 22px;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.chat-attachment-bar {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.84);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(18px);
+    pointer-events: auto;
+}
+
+.chat-attachment-upload-btn {
+    flex: 0 0 auto;
+    border: none;
+    border-radius: 999px;
+    background: #172033;
+    color: #ffffff;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.chat-attachment-upload-btn:hover {
+    background: #24314d;
+    transform: translateY(-1px);
+}
+
+.chat-attachment-content {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.attachment-strip-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+}
+
+.attachment-strip-label {
+    flex: 0 0 auto;
+    min-width: 82px;
+    padding-top: 4px;
+    color: #667085;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.attachment-strip-items {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #25324a;
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.2;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+.attachment-chip:hover {
+    background: #dfe7ff;
+    color: #162033;
+}
+
+.attachment-chip-output {
+    background: #edfdf4;
+    color: #17603a;
+}
+
+.attachment-chip-output:hover {
+    background: #daf6e7;
+    color: #0d4f2d;
+}
+
+.attachment-chip-meta {
+    color: #667085;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.attachment-strip-empty {
+    color: #98a2b3;
+    font-size: 13px;
+    padding: 7px 0;
+}
+
 .chat-empty-state {
     position: absolute;
     inset: 0;
@@ -1299,6 +1417,43 @@ deep-chat::part(input-area) {
     line-height: 1.6;
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+
+.artifact-links {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.artifact-links-label {
+    color: #667085;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.artifact-links-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.artifact-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #edfdf4;
+    color: #17603a;
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.artifact-link:hover {
+    background: #daf6e7;
 }
 
 /* Simple loading for non-reasoning models */
