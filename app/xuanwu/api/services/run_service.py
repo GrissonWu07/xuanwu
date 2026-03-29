@@ -117,6 +117,7 @@ async def execute_agent_run(
             provider_config=provider_config,
             extra={
                 "agent_id": target_agent_id,
+                "run_id": run_id,
                 "context": request_context or {},
                 "attachment_context": await thread_files.build_prompt_context_bundle(),
                 "attachment_batch_id": runtime_batch.batch_id,
