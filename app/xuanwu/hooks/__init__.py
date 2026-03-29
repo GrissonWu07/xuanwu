@@ -19,10 +19,63 @@ from app.xuanwu.hooks.system import (
     HookDefinition,
     HookSystem,
 )
+from app.xuanwu.hooks.runtime_models import (
+    HookDecision,
+    HookDecisionRecord,
+    HookEventEnvelope,
+    HookEventType,
+    HookScriptAction,
+    HookScriptActionBatch,
+    HookScriptActionType,
+    HookWriteMemoryRequest,
+    HookContextInjection,
+    PendingHookItem,
+    PendingHookStatus,
+)
+from app.xuanwu.hooks.runtime_store import HookStateStore
+from app.xuanwu.hooks.runtime_sinks import (
+    ContextSink,
+    HookMemoryWriteResult,
+    MemorySink,
+)
+from app.xuanwu.hooks.runtime import (
+    HookHandlerDefinition,
+    HookRuntime,
+    HookRuntimeContext,
+)
+from app.xuanwu.hooks.runtime_script import (
+    HookScriptExecutionError,
+    HookScriptExecutionResult,
+    HookScriptHandlerDefinition,
+    HookScriptRunner,
+)
 
 __all__ = [
     "HookPhase",
     "HookExecutionMode",
     "HookDefinition",
     "HookSystem",
+    "HookDecision",
+    "HookDecisionRecord",
+    "HookEventEnvelope",
+    "HookEventType",
+    "HookScriptAction",
+    "HookScriptActionBatch",
+    "HookScriptActionType",
+    "HookWriteMemoryRequest",
+    "HookContextInjection",
+    "PendingHookItem",
+    "PendingHookStatus",
+    "HookStateStore",
+    "ContextSink",
+    "HookMemoryWriteResult",
+    "MemorySink",
+    "HookHandlerDefinition",
+    "HookRuntime",
+    "HookRuntimeContext",
+    "HookScriptExecutionError",
+    "HookScriptExecutionResult",
+    "HookScriptHandlerDefinition",
+    "HookScriptRunner",
 ]
+
