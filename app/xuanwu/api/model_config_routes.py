@@ -6,8 +6,12 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel as PydanticBaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.xuanwu.auth.guards import require_admin
+from app.xuanwu.auth.models import UserInfo
 from app.xuanwu.db import get_db_session_dependency as get_db_session
 from app.xuanwu.db.models import ModelConfigModel
 from app.xuanwu.db.orm.model_config import ModelConfigService
