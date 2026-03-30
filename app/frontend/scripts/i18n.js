@@ -3,7 +3,7 @@
  * Provides multi-language support
  */
 
-const LOCALE_STORAGE_KEY = 'atlasclaw_locale';
+const LOCALE_STORAGE_KEY = 'xuanwu_locale';
 const SUPPORTED_LOCALES = ['zh-CN', 'en-US'];
 const DEFAULT_LOCALE = 'en-US';
 

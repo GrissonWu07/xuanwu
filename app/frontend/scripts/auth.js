@@ -1,5 +1,5 @@
-const AUTH_STORAGE_KEY = 'atlasclaw_auth_token'
-const AUTH_HEADER_NAME = 'AtlasClaw-Authenticate'
+const AUTH_STORAGE_KEY = 'xuanwu_auth_token'
+const AUTH_HEADER_NAME = 'XuanWu-Authenticate'
 
 export function redirectToLogin() {
   const current = `${window.location.pathname}${window.location.search}`
@@ -34,7 +34,7 @@ export function clearAuthToken() {
 }
 
 export function installAuthFetchInterceptor() {
-  if (window.__atlasclawFetchWrapped) {
+  if (window.__xuanwuFetchWrapped) {
     return
   }
 
@@ -62,7 +62,7 @@ export function installAuthFetchInterceptor() {
     return rawFetch(input, nextInit)
   }
 
-  window.__atlasclawFetchWrapped = true
+  window.__xuanwuFetchWrapped = true
 }
 
 export async function checkAuth({ redirect = true } = {}) {

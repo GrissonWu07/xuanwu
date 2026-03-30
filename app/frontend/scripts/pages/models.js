@@ -267,7 +267,7 @@ async function loadProviderData() {
 
   // Restore cached models from localStorage (with 24h TTL)
   try {
-    const cached = JSON.parse(localStorage.getItem('atlasclaw_fetched_models') || '{}')
+    const cached = JSON.parse(localStorage.getItem('xuanwu_fetched_models') || '{}')
     const now = Date.now()
     const TTL = 24 * 60 * 60 * 1000 // 24 hours
     for (const [prov, entry] of Object.entries(cached)) {
@@ -336,9 +336,9 @@ async function fetchModelsFromProvider(silent = false) {
 
       // Save to localStorage
       try {
-        const cached = JSON.parse(localStorage.getItem('atlasclaw_fetched_models') || '{}')
+        const cached = JSON.parse(localStorage.getItem('xuanwu_fetched_models') || '{}')
         cached[provider] = { models: allModels, timestamp: Date.now() }
-        localStorage.setItem('atlasclaw_fetched_models', JSON.stringify(cached))
+        localStorage.setItem('xuanwu_fetched_models', JSON.stringify(cached))
       } catch (e) { /* ignore storage errors */ }
 
       // Rebuild dropdown

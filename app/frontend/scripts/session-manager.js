@@ -5,7 +5,7 @@
 
 import { createThreadSession } from './api-client.js';
 
-const SESSION_KEY_STORAGE = 'atlasclaw_session_key';
+const SESSION_KEY_STORAGE = 'xuanwu_session_key';
 
 let currentSessionKey = null;
 

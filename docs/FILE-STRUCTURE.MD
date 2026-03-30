@@ -1,15 +1,15 @@
-# AtlasClaw Agent Guide
+# XuanWu Agent Guide
 
 > **DEPRECATED**: This document has been superseded by [Architecture](./ARCHITECTURE.MD) §3 (Directory Structure).
 > Please refer to the canonical architecture document.
 
-This document describes the relationship between Users, Workspaces, Agents, Providers, Skills, and Channels in the AtlasClaw enterprise AI agent framework.
+This document describes the relationship between Users, Workspaces, Agents, Providers, Skills, and Channels in the XuanWu enterprise AI agent framework.
 
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              AtlasClaw System                                 │
+│                              XuanWu System                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌───────────┐ │
@@ -40,7 +40,7 @@ This document describes the relationship between Users, Workspaces, Agents, Prov
 
 ### 1. User
 
-A **User** represents an authenticated entity in the AtlasClaw system.
+A **User** represents an authenticated entity in the XuanWu system.
 
 **Key Characteristics:**
 - Identified by a unique `user_id` (UUID)
@@ -58,7 +58,7 @@ A **User** represents an authenticated entity in the AtlasClaw system.
 
 ### 2. Workspace
 
-A **Workspace** is the root organizational unit containing all AtlasClaw resources.
+A **Workspace** is the root organizational unit containing all XuanWu resources.
 
 **Key Characteristics:**
 - Contains system-wide configuration and resources
@@ -81,8 +81,8 @@ A **Workspace** is the root organizational unit containing all AtlasClaw resourc
 ├── channels/                            # External system-level channel configs
 │   └── <channel_name>/
 │       └── config.json
-├── .atlasclaw/                          # Workspace directory (default)
-│   ├── atlasclaw.json                   # Core configuration
+├── .xuanwu/                          # Workspace directory (default)
+│   ├── xuanwu.json                   # Core configuration
 │   ├── agents/                          # Agent definitions
 │   │   └── main/                        # Default agent
 │   │       ├── SOUL.md                  # System prompt & capabilities
@@ -97,18 +97,18 @@ A **Workspace** is the root organizational unit containing all AtlasClaw resourc
 │           │   ├── <session-id>.jsonl   # Transcript files
 │           │   └── archive/             # Archived transcripts
 │           └── memory/                  # Long-term memory storage
-├── atlasclaw.json                       # Project configuration (symlink or copy)
+├── xuanwu.json                       # Project configuration (symlink or copy)
 └── .gitignore                           # Git ignore rules
 ```
 
 **Global User Storage:**
 ```
-~/.atlasclaw/
+~/.xuanwu/
 └── users.json                           # User authentication mapping
 ```
 
 **Initialization:**
-- `WorkspaceInitializer` creates the `.atlasclaw` structure
+- `WorkspaceInitializer` creates the `.xuanwu` structure
 - `UserWorkspaceInitializer` creates per-user directories
 - Default `main` agent is created if it doesn't exist
 
@@ -147,7 +147,7 @@ class AgentConfig:
 ```
 
 **Loading Process:**
-1. `AgentLoader` scans `.atlasclaw/agents/<agent_id>/`
+1. `AgentLoader` scans `.xuanwu/agents/<agent_id>/`
 2. `AgentDefinitionParser` extracts data from Markdown files
 3. Configuration is merged with defaults
 4. `AgentConfig` object is returned
@@ -166,7 +166,7 @@ A **Provider** is an external service integration (e.g., Jira, Confluence, GitHu
 
 **Provider Structure:**
 ```
-app/atlasclaw/providers/
+app/xuanwu/providers/
 └── <provider_name>/
     ├── __init__.py
     ├── provider.py              # Provider implementation
@@ -216,7 +216,7 @@ User ──▶ Channel Adapter ──▶ Session Manager ──▶ Agent Runner 
 │                         Relationship Overview                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│   Workspace (.atlasclaw/)                                                   │
+│   Workspace (.xuanwu/)                                                   │
 │   │                                                                         │
 │   ├── agents/                                                               │
 │   │   └── main/                                                             │
@@ -297,18 +297,18 @@ User ──▶ Channel Adapter ──▶ Session Manager ──▶ Agent Runner 
 Configuration is loaded in the following priority order (highest to lowest):
 
 ```
-1. Workspace-level (.atlasclaw/)
+1. Workspace-level (.xuanwu/)
    - Agent definitions (SOUL.md, etc.)
    - Provider configurations
    - Workspace skills
 
 2. User-level (users/<user_id>/)
-   - User-specific settings (atlasclaw.json)
+   - User-specific settings (xuanwu.json)
    - Channel configurations
    - Session data
    - Long-term memory
 
-3. Global-level (~/.atlasclaw/)
+3. Global-level (~/.xuanwu/)
    - User authentication mapping (users.json)
    - Global skills
 

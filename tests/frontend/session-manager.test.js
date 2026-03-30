@@ -58,7 +58,7 @@ describe('session-manager.js', () => {
             expect(key).toBe('new-session-key');
             expect(global.fetch).toHaveBeenCalled();
             expect(sessionStorageMock.setItem).toHaveBeenCalledWith(
-                'atlasclaw_session_key',
+                'xuanwu_session_key',
                 'new-session-key'
             );
         });
@@ -110,7 +110,7 @@ describe('session-manager.js', () => {
             setSessionKey('new-key');
             
             expect(sessionStorageMock.setItem).toHaveBeenCalledWith(
-                'atlasclaw_session_key',
+                'xuanwu_session_key',
                 'new-key'
             );
         });
@@ -119,7 +119,7 @@ describe('session-manager.js', () => {
             const { setSessionKey } = await import('../../app/frontend/scripts/session-manager.js');
             setSessionKey(null);
             
-            expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('atlasclaw_session_key');
+            expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('xuanwu_session_key');
         });
     });
 
@@ -192,7 +192,7 @@ describe('session-manager.js', () => {
             const { clearSession } = await import('../../app/frontend/scripts/session-manager.js');
             clearSession();
             
-            expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('atlasclaw_session_key');
+            expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('xuanwu_session_key');
         });
     });
 });
