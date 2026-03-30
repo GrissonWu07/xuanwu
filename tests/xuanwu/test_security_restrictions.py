@@ -66,6 +66,29 @@ async def test_read_write_exec_are_restricted_to_user_work_dir(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_runtime_tools_use_scoped_work_dir_override_when_present(tmp_path):
+    ctx = _build_ctx(tmp_path)
+    user_work_dir = ensure_user_work_dir(tmp_path, "u-sec")
+    scoped_work_dir = (
+        user_work_dir
+        / "attachments"
+        / "thread-123"
+        / "1711612555"
+        / "workspace"
+    )
+    scoped_work_dir.mkdir(parents=True, exist_ok=True)
+    ctx.deps.extra["work_dir"] = str(scoped_work_dir)
+
+    write_ok = await write_tool(ctx, "note.txt", "hello")
+    assert write_ok["is_error"] is False
+    assert (scoped_work_dir / "note.txt").exists()
+
+    exec_ok = await exec_tool(ctx, "python -c \"print('ok')\"")
+    assert exec_ok["is_error"] is False
+    assert exec_ok["details"]["cwd"] == str(scoped_work_dir)
+
+
+@pytest.mark.asyncio
 async def test_session_and_memory_store_encoded_untrusted_input(tmp_path):
     session_manager = SessionManager(workspace_path=str(tmp_path), user_id="u-sec")
     memory_manager = MemoryManager(workspace=str(tmp_path), user_id="u-sec")

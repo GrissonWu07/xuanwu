@@ -215,6 +215,22 @@ class TestPromptBuilder:
         assert len(prompt) > 0
 
 
+    def test_build_with_attachment_runtime_hints(self):
+        config = PromptBuilderConfig()
+        builder = PromptBuilder(config)
+
+        prompt = builder.build(
+            attachment_runtime={
+                "attachment_batch_id": "1711612555",
+                "attachment_outputs_dir": "/tmp/attachments/thread-1/1711612555/outputs",
+                "attachment_workspace_dir": "/tmp/attachments/thread-1/1711612555/workspace",
+            }
+        )
+
+        assert "## Attachment Runtime" in prompt
+        assert "1711612555" in prompt
+        assert "present_files" in prompt
+
     def test_builder_uses_configured_workspace_path_when_not_provided(self, tmp_path, monkeypatch):
         """PromptBuilder should resolve workspace path from config when omitted."""
         config_path = tmp_path / "xuanwu.json"

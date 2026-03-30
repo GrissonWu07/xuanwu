@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, urlparse
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -154,6 +154,10 @@ def test_agent_run_injects_attachment_context_and_streams_artifacts(tmp_path):
         })
         for event_type, payload in events
     ]
+    artifact_payload = next(payload for event_type, payload in events if event_type == "artifact")
+    artifact_query = parse_qs(urlparse(artifact_payload["download_url"]).query)
+    assert "expires_at" in artifact_query
+    assert "sig" in artifact_query
 
     attachment_context = client._runner.last_extra["attachment_context"]
     assert attachment_context["uploads"][0]["filename"] == "notes.txt"

@@ -16,7 +16,9 @@ attachment visibility.
 - Added backend thread file foundation in `app/xuanwu/thread_files/`
 - Added session attachment API for listing, uploading, and downloading entries
 - Added runtime attachment context injection into prompt building
+- Added runtime attachment-path hints to prompt building for deterministic export flow
 - Added artifact SSE event emission and artifact download URLs
+- Added explicit `present_files` tool for selecting which generated files are exported
 - Added frontend upload entry on the chat page
 - Added bottom attachment strip with uploads and outputs
 - Added assistant-message artifact links
@@ -36,13 +38,16 @@ attachment visibility.
 - `app/xuanwu/api/routes_session.py`
 - `app/xuanwu/api/services/run_service.py`
 - `app/xuanwu/agent/runner_prompt_context.py`
+- `app/xuanwu/agent/prompt_builder.py`
+- `app/xuanwu/agent/prompt_sections.py`
+- `app/xuanwu/tools/filesystem/present_tool.py`
 - `app/frontend/scripts/pages/chat.js`
 - `app/frontend/scripts/chat-ui.js`
 - `app/frontend/styles/main.css`
 
 ## Verification
 
-- `pytest tests/xuanwu -q` -> `834 passed, 1 xfailed`
+- `pytest tests/xuanwu -q` -> `831 passed, 1 xfailed`
 - `npm test -- --runInBand` -> `106 passed`
 - `npm run build` -> success
 

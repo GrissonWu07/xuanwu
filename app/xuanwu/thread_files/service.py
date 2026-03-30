@@ -157,16 +157,31 @@ class ThreadFileService:
         self,
         batch_id: str,
         before_paths: set[str],
+        *,
+        presented_relative_paths: Optional[list[str]] = None,
     ) -> list[ThreadArtifactRecord]:
-        """Register new workspace/output files as downloadable artifacts."""
+        """Register runtime files as downloadable artifacts.
+
+        When `presented_relative_paths` is provided, only those explicit paths
+        are exported. Otherwise all newly-created workspace/output files are
+        exported (legacy behavior).
+        """
         new_paths = await asyncio.to_thread(self._snapshot_runtime_files_sync, batch_id)
         created_paths = sorted(new_paths - set(before_paths))
-        created_paths.sort(
-            key=lambda item: (
-                0 if item.startswith(f"{batch_id}/workspace/") else 1,
-                item,
+        if presented_relative_paths:
+            explicit_paths = await asyncio.to_thread(
+                self._resolve_presented_paths_sync,
+                batch_id,
+                presented_relative_paths,
             )
-        )
+            created_paths = explicit_paths
+        else:
+            created_paths.sort(
+                key=lambda item: (
+                    0 if item.startswith(f"{batch_id}/workspace/") else 1,
+                    item,
+                )
+            )
         if not created_paths:
             return []
 
@@ -186,6 +201,34 @@ class ThreadFileService:
                 created_records.append(record)
             await asyncio.to_thread(self._write_index_locked, batch_id, index)
             return created_records
+
+    def _resolve_presented_paths_sync(self, batch_id: str, raw_paths: list[str]) -> list[str]:
+        resolved: list[str] = []
+        seen: set[str] = set()
+
+        for raw in raw_paths:
+            value = str(raw or "").strip().replace("\\", "/")
+            if not value:
+                continue
+            candidate = Path(value)
+            if candidate.is_absolute():
+                continue
+            if any(part in {"..", "."} for part in candidate.parts):
+                continue
+
+            normalized = value
+            if not normalized.startswith(f"{batch_id}/"):
+                normalized = f"{batch_id}/{normalized.lstrip('/')}"
+
+            full_path = self.paths.root / normalized
+            if not full_path.is_file():
+                continue
+            normalized = normalized.replace(os.sep, "/")
+            if normalized not in seen:
+                seen.add(normalized)
+                resolved.append(normalized)
+
+        return resolved
 
     async def read_index(self, batch_id: str) -> ThreadFileIndex:
         """Load the batch-local index, bootstrapping an empty file when needed."""

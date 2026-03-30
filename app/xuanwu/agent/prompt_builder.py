@@ -113,6 +113,7 @@ class PromptBuilder:
         user_info: Optional["UserInfo"] = None,
         provider_contexts: Optional[dict[str, dict]] = None,
         attachment_context: Optional[dict[str, list[dict]]] = None,
+        attachment_runtime: Optional[dict[str, str]] = None,
     ) -> str:
         """
         Build the full system prompt for the current run.
@@ -167,6 +168,9 @@ class PromptBuilder:
 
             if attachment_context:
                 parts.append(self._build_attachment_context(attachment_context))
+
+            if attachment_runtime:
+                parts.append(self._build_attachment_runtime(attachment_runtime))
             
             # 6. Workspace context
             parts.append(self._build_workspace_info())
@@ -231,6 +235,9 @@ class PromptBuilder:
 
     def _build_attachment_context(self, attachment_context: dict[str, list[dict]]) -> str:
         return prompt_sections.build_attachment_context(attachment_context)
+
+    def _build_attachment_runtime(self, attachment_runtime: dict[str, str]) -> str:
+        return prompt_sections.build_attachment_runtime(attachment_runtime)
     
     def _build_workspace_info(self) -> str:
         return prompt_sections.build_workspace_info(self.config)
