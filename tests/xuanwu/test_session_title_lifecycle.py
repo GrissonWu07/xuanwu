@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.atlasclaw.agent.session_titles import SessionTitleGenerator
-from app.atlasclaw.session.manager import SessionManager
+from app.xuanwu.agent.session_titles import SessionTitleGenerator
+from app.xuanwu.session.manager import SessionManager
 
 
 def test_session_title_generator_builds_draft_title():

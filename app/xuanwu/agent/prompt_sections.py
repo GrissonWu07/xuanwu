@@ -379,9 +379,30 @@ def build_reply_tags() -> str:
     return ""
 
 
-def build_heartbeats() -> str:
-    """Build heartbeat section (currently optional/no-op)."""
-    return ""
+def build_heartbeats(
+    *,
+    heartbeat_markdown: str = "",
+    every_seconds: Optional[int] = None,
+    active_hours: str = "",
+    isolated_session: bool = False,
+) -> str:
+    """Build heartbeat guidance section when heartbeat context is available."""
+    if not heartbeat_markdown.strip():
+        return ""
+
+    lines = ["## Heartbeat", ""]
+    if every_seconds is not None:
+        lines.append(f"Schedule: every {every_seconds} seconds")
+    if active_hours:
+        lines.append(f"Active hours: {active_hours}")
+    lines.append(
+        "Execution mode: isolated session"
+        if isolated_session
+        else "Execution mode: shared session"
+    )
+    lines.append("")
+    lines.append(heartbeat_markdown.strip())
+    return "\n".join(lines)
 
 
 def build_runtime_info() -> str:

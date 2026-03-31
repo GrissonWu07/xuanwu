@@ -11,7 +11,7 @@ import pytest
 
 from app.xuanwu.channels import ChannelConnection, ChannelRegistry
 from app.xuanwu.channels.handlers import WebSocketHandler
-from app.xuanwu.channels.models import InboundMessage
+from app.xuanwu.channels.models import ConnectionStatus, InboundMessage
 from app.xuanwu.channels.manager import ChannelManager
 
 
@@ -158,6 +158,42 @@ class TestChannelManager:
         
         assert len(connections) == 1
         assert connections[0]["channel_type"] == "websocket"
+
+    @pytest.mark.asyncio
+    async def test_probe_connection_reports_health_and_status(self):
+        handler = WebSocketHandler({})
+        handler._status = ConnectionStatus.CONNECTED
+        handler.health_check = AsyncMock(return_value=True)
+        instance_key = "user-123:websocket:conn-123"
+        self.manager._active_connections[instance_key] = handler
+
+        result = await self.manager.probe_connection("user-123", "websocket", "conn-123")
+
+        assert result["healthy"] is True
+        assert result["status"] == "connected"
+
+    @pytest.mark.asyncio
+    async def test_reconnect_connection_delegates_to_handler(self):
+        handler = WebSocketHandler({})
+        handler._status = ConnectionStatus.ERROR
+        handler.reconnect = AsyncMock(return_value=True)
+        instance_key = "user-123:websocket:conn-123"
+        self.manager._active_connections[instance_key] = handler
+
+        result = await self.manager.reconnect_connection("user-123", "websocket", "conn-123")
+
+        assert result is True
+        handler.reconnect.assert_awaited_once()
+
+    def test_list_active_connection_descriptors(self):
+        handler = WebSocketHandler({})
+        self.manager._active_connections["user-123:websocket:conn-1"] = handler
+        self.manager._active_connections["user-123:websocket:conn-2"] = handler
+
+        items = self.manager.list_active_connection_descriptors()
+
+        assert len(items) == 2
+        assert items[0]["user_id"] == "user-123"
 
     @pytest.mark.asyncio
     async def test_enable_connection(self):

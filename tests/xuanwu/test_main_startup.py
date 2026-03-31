@@ -6,7 +6,9 @@ main.py 启动流程测试
 验证所有组件正确初始化：SessionManager, SkillRegistry, AgentRunner 等。
 """
 
+import json
 import os
+import time
 import pytest
 from pathlib import Path
 
@@ -56,6 +58,95 @@ class TestMainStartup:
             resp = client.get("/api/health")
             assert resp.status_code == 200
             assert resp.json()["status"] == "healthy"
+
+    def test_startup_initializes_heartbeat_runtime_when_enabled(self, test_config_path, tmp_path, monkeypatch):
+        """Heartbeat-enabled config should bootstrap runtime during lifespan startup."""
+        import importlib
+        from app.xuanwu.api.deps_context import get_api_context
+
+        base_config = json.loads(Path(test_config_path).read_text(encoding="utf-8"))
+        workspace_path = tmp_path / ".xuanwu-test"
+        (workspace_path / "users" / "workspace-admin").mkdir(parents=True, exist_ok=True)
+        base_config["workspace"] = {"path": str(workspace_path)}
+        base_config["heartbeat"] = {
+            "enabled": True,
+            "runtime": {"tick_seconds": 60, "max_concurrent_jobs": 4},
+            "agent_turn": {"enabled": True, "every_seconds": 300},
+            "channel_connection": {"enabled": False},
+        }
+        config_path = tmp_path / "heartbeat.test.json"
+        config_path.write_text(json.dumps(base_config, ensure_ascii=False, indent=2), encoding="utf-8")
+        monkeypatch.setenv("XUANWU_CONFIG", str(config_path))
+
+        import app.xuanwu.main as main_module
+        importlib.reload(main_module)
+
+        with TestClient(main_module.app) as client:
+            resp = client.get("/api/health")
+            assert resp.status_code == 200
+            ctx = get_api_context()
+            assert ctx.heartbeat_runtime is not None
+            assert main_module._heartbeat_task is not None
+            for _ in range(50):
+                if ctx.heartbeat_runtime._jobs:
+                    break
+                time.sleep(0.02)
+            owners = {job.owner_user_id for job in ctx.heartbeat_runtime._jobs.values()}
+            assert "default" not in owners
+            assert "workspace-admin" in owners
+
+    @pytest.mark.asyncio
+    async def test_collect_runtime_user_ids_uses_existing_user_isolation(self, tmp_path, monkeypatch):
+        """Runtime user discovery should collect real isolated user ids only."""
+        import importlib
+
+        workspace_path = tmp_path / ".xuanwu-test"
+        users_dir = workspace_path / "users"
+        (users_dir / "workspace-user").mkdir(parents=True, exist_ok=True)
+        (workspace_path / "users.json").write_text(
+            json.dumps(
+                {
+                    "users": [
+                        {
+                            "user_id": "shadow-user",
+                            "provider": "oidc",
+                            "subject": "subject-1",
+                            "display_name": "Shadow User",
+                            "tenant_id": "default",
+                            "roles": [],
+                            "auth_type": "oidc:keycloak",
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        import app.xuanwu.main as main_module
+        importlib.reload(main_module)
+
+        async def _fake_db_users(_: bool) -> set[str]:
+            return {"admin", "default", "anonymous"}
+
+        monkeypatch.setattr(main_module, "_list_db_runtime_user_ids", _fake_db_users)
+
+        class _FakeChannelManager:
+            def list_active_connection_descriptors(self):
+                return [
+                    {"user_id": "channel-user"},
+                    {"user_id": "default"},
+                    {"user_id": ""},
+                ]
+
+        user_ids = await main_module._collect_runtime_user_ids(
+            workspace_path,
+            db_initialized=True,
+            channel_manager=_FakeChannelManager(),
+        )
+
+        assert user_ids == ["admin", "channel-user", "shadow-user", "workspace-user"]
 
 
 

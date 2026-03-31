@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pydantic_ai.messages import ModelRequest, SystemPromptPart, UserPromptPart
 
-from app.atlasclaw.agent.compaction import CompactionConfig, CompactionPipeline
-from app.atlasclaw.agent.history_memory import HistoryMemoryCoordinator
+from app.xuanwu.agent.compaction import CompactionConfig, CompactionPipeline
+from app.xuanwu.agent.history_memory import HistoryMemoryCoordinator
 
 
 def test_history_memory_normalize_messages_splits_system_and_user_parts():

@@ -20,6 +20,7 @@ from ..skills.registry import SkillRegistry
 from ..hooks.runtime import HookRuntime
 from ..hooks.runtime_sinks import ContextSink, MemorySink
 from ..hooks.runtime_store import HookStateStore
+from ..heartbeat.runtime import HeartbeatRuntime
 from .sse import SSEManager
 from .webhook_dispatch import WebhookDispatchManager
 
@@ -35,6 +36,7 @@ class APIContext:
     memory_sink: Optional[MemorySink] = None
     context_sink: Optional[ContextSink] = None
     hook_runtime: Optional[HookRuntime] = None
+    heartbeat_runtime: Optional[HeartbeatRuntime] = None
     sse_manager: Optional[SSEManager] = None
     agent_runner: Optional[Any] = None
     agent_runners: dict[str, Any] | None = None

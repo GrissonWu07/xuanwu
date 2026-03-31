@@ -99,6 +99,11 @@ class ShadowUserStore:
         await self._ensure_loaded()
         return self._users.get(user_id)
 
+    async def list_all(self) -> list[ShadowUser]:
+        """Return all persisted shadow users."""
+        await self._ensure_loaded()
+        return list(self._users.values())
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

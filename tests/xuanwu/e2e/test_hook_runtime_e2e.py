@@ -68,7 +68,7 @@ def _create_hooks_e2e_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     }
 
     config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
-    monkeypatch.setenv("ATLASCLAW_CONFIG", str(config_path.resolve()))
+    monkeypatch.setenv("XUANWU_CONFIG", str(config_path.resolve()))
 
     import app.xuanwu.core.config as config_module
     from app.xuanwu.main import create_app

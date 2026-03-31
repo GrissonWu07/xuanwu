@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from enum import Enum
 from typing import Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.xuanwu.heartbeat.models import HeartbeatTargetType
 
 # Auth config is imported lazily to avoid circular imports at module load time.
 # AuthConfig is referenced only in XuanWuConfig.auth field annotation.
@@ -147,6 +149,75 @@ class HooksRuntimeConfig(BaseModel):
     """Hook runtime extension configuration."""
 
     script_handlers: list[HookScriptHandlerConfig] = Field(default_factory=list)
+
+
+class HeartbeatTargetConfig(BaseModel):
+    """Heartbeat target descriptor configuration."""
+
+    type: HeartbeatTargetType = Field(default=HeartbeatTargetType.NONE)
+    user_id: str = ""
+    channel: str = ""
+    account_id: str = ""
+    peer_id: str = ""
+    session_key: str = ""
+    thread_id: str = ""
+
+
+class HeartbeatActiveHoursConfig(BaseModel):
+    """Optional heartbeat active-hours constraint."""
+
+    timezone: str = Field(default="Asia/Shanghai")
+    start: str = Field(default="09:00")
+    end: str = Field(default="22:00")
+
+
+class HeartbeatRuntimeConfig(BaseModel):
+    """Global heartbeat runtime config."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    tick_seconds: int = Field(default=30, ge=1)
+    max_concurrent_jobs: int = Field(default=16, ge=1)
+    emit_runtime_events: bool = Field(default=True, alias="event_reporting")
+    persist_local_event_log: bool = True
+
+
+class HeartbeatDefaultsConfig(BaseModel):
+    """Shared heartbeat defaults."""
+
+    active_hours: HeartbeatActiveHoursConfig = Field(default_factory=HeartbeatActiveHoursConfig)
+
+
+class AgentHeartbeatConfig(BaseModel):
+    """Agent-turn heartbeat defaults."""
+
+    enabled: bool = False
+    every_seconds: int = Field(default=3600, ge=1)
+    isolated_session: bool = True
+    light_context: bool = True
+    silent_ok: bool = True
+    heartbeat_file: str = "HEARTBEAT.md"
+    target: HeartbeatTargetConfig = Field(default_factory=HeartbeatTargetConfig)
+
+
+class ChannelHeartbeatConfig(BaseModel):
+    """Channel-connection heartbeat defaults."""
+
+    enabled: bool = False
+    check_interval_seconds: int = Field(default=30, ge=1)
+    failure_threshold: int = Field(default=3, ge=1)
+    degraded_threshold: int = Field(default=3, ge=1)
+    reconnect_backoff_seconds: list[int] = Field(default_factory=lambda: [10, 30, 60, 300])
+
+
+class HeartbeatConfig(BaseModel):
+    """Unified heartbeat runtime configuration."""
+
+    enabled: bool = False
+    runtime: HeartbeatRuntimeConfig = Field(default_factory=HeartbeatRuntimeConfig)
+    defaults: HeartbeatDefaultsConfig = Field(default_factory=HeartbeatDefaultsConfig)
+    agent_turn: AgentHeartbeatConfig = Field(default_factory=AgentHeartbeatConfig)
+    channel_connection: ChannelHeartbeatConfig = Field(default_factory=ChannelHeartbeatConfig)
 
 
 class WebhookSystemConfig(BaseModel):
@@ -313,6 +384,7 @@ class XuanWuConfig(BaseModel):
     reset: ResetConfig = Field(default_factory=ResetConfig)
     webhook: WebhookConfig = Field(default_factory=WebhookConfig)
     hooks_runtime: HooksRuntimeConfig = Field(default_factory=HooksRuntimeConfig)
+    heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
 
     # Auth configuration — loaded from `auth` section of xuanwu.json.
     # None means no auth config present; runtime falls back to anonymous mode.

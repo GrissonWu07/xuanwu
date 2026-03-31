@@ -601,3 +601,60 @@ class ChannelManager:
             return status_map.get(status, "disconnected")
         except Exception:
             return "disconnected"
+
+    def list_active_connection_descriptors(self) -> list[dict[str, Any]]:
+        """Return lightweight descriptors for all active connections."""
+        items: list[dict[str, Any]] = []
+        for key, handler in sorted(self._active_connections.items()):
+            parts = key.split(":")
+            if len(parts) != 3:
+                continue
+            user_id, channel_type, connection_id = parts
+            items.append(
+                {
+                    "user_id": user_id,
+                    "channel_type": channel_type,
+                    "connection_id": connection_id,
+                    "status": self.get_connection_runtime_status(connection_id),
+                    "supports_long_connection": bool(getattr(handler, "supports_long_connection", False)),
+                }
+            )
+        return items
+
+    async def probe_connection(
+        self,
+        user_id: str,
+        channel_type: str,
+        connection_id: str,
+    ) -> dict[str, Any]:
+        """Run a narrow health probe for an active connection."""
+        instance_key = f"{user_id}:{channel_type}:{connection_id}"
+        handler = self._active_connections.get(instance_key)
+        if handler is None:
+            return {"healthy": False, "status": "disconnected", "reconnected": False}
+
+        healthy = await handler.health_check()
+        return {
+            "healthy": healthy,
+            "status": self.get_connection_runtime_status(connection_id),
+            "reconnected": False,
+        }
+
+    async def reconnect_connection(
+        self,
+        user_id: str,
+        channel_type: str,
+        connection_id: str,
+    ) -> bool:
+        """Attempt a best-effort reconnect for an active long connection."""
+        instance_key = f"{user_id}:{channel_type}:{connection_id}"
+        handler = self._active_connections.get(instance_key)
+        if handler is None:
+            return False
+        if not getattr(handler, "supports_long_connection", False):
+            return False
+        try:
+            return bool(await handler.reconnect())
+        except Exception:
+            logger.exception("Failed to reconnect channel connection: %s", instance_key)
+            return False

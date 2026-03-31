@@ -1261,6 +1261,29 @@ repos:
       - id: mypy
 ```
 
+### 11.3 Heartbeat Runtime Standards
+
+When implementing or extending heartbeat functionality:
+
+- keep heartbeat scheduling separate from Hook Runtime scheduling
+- use `HeartbeatRuntime` typed jobs instead of ad-hoc background loops
+- emit standard heartbeat events before any notification delivery
+- persist per-user heartbeat state under `workspace/users/<user_id>/heartbeat/`
+- treat channel heartbeat as self-healing first, alerting second
+- preserve OpenClaw-aligned semantics for agent heartbeat where applicable:
+  - `HEARTBEAT.md`
+  - `every`
+  - `activeHours`
+  - `isolatedSession`
+  - `HEARTBEAT_OK`
+
+Required verification for heartbeat changes:
+
+- unit tests for config/models/store/targets/runtime
+- integration coverage for hook event bridging
+- end-to-end coverage for runtime execution and persisted state
+- full application E2E pass with a live server before claiming completion
+
 ---
 
 ## 12. Deployment & Operations

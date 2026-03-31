@@ -1476,6 +1476,64 @@ Responsibilities:
 This module exists to exercise the generic runtime end-to-end. It is not a
 special-case skill engine and does not add domain-specific learning semantics to the core.
 
+### 10.8 Heartbeat Integration
+
+Hook Runtime is a downstream consumer of heartbeat events rather than the heartbeat scheduler.
+
+Heartbeat bridge utilities convert heartbeat outcomes into generic hook runtime events while
+preserving available routing metadata such as:
+
+- `session_key`
+- `run_id`
+- `channel`
+- `account_id`
+
+This allows web chat, hook scripts, and future notification consumers to react to heartbeat
+results without coupling heartbeat directly to any one delivery channel.
+
+## 10A. Heartbeat Module
+
+**Path**: `app/atlasclaw/heartbeat/`
+
+Provides unified periodic execution for agent-side heartbeat turns and long-lived channel
+connection checks.
+
+### 10A.1 Runtime Core
+
+| Component | Purpose |
+|---|---|
+| `HeartbeatRuntime` | Schedules due jobs, enforces concurrency, persists state, emits events |
+| `HeartbeatRuntimeContext` | Injects executors, store, and event-bridge behavior |
+| `HeartbeatStateStore` | Persists job definitions, state snapshots, and local heartbeat event logs |
+| `HeartbeatTargetResolver` | Resolves delivery targets such as `user_chat`, `group_chat`, `session`, and `thread` |
+
+### 10A.2 Models
+
+| Model / Enum | Purpose |
+|---|---|
+| `HeartbeatJobType` | `agent_turn` / `channel_connection` |
+| `HeartbeatTargetType` | `none`, `last_active`, `user_chat`, `channel_connection`, `group_chat`, `session`, `thread` |
+| `HeartbeatDeliveryMode` | Delivery semantics including `summary_only` |
+| `HeartbeatEventType` | Heartbeat runtime event taxonomy |
+| `HeartbeatJobDefinition` | Normalized heartbeat job definition |
+| `HeartbeatJobStateSnapshot` | Durable health and scheduling state |
+| `HeartbeatEventEnvelope` | Persisted heartbeat event payload |
+
+### 10A.3 Executors
+
+| Executor | Description |
+|---|---|
+| `AgentHeartbeatExecutor` | Executes OpenClaw-style heartbeat turns, normalizes `HEARTBEAT_OK`, returns context payloads |
+| `ChannelHeartbeatExecutor` | Probes and reconnects long-lived channel connections, tracks quiet retries and degraded state |
+
+### 10A.4 Storage
+
+Per-user heartbeat storage layout:
+
+- `<workspace>/users/<user_id>/heartbeat/jobs.json`
+- `<workspace>/users/<user_id>/heartbeat/state.json`
+- `<workspace>/users/<user_id>/heartbeat/events.jsonl`
+
 ## 11. Database Module
 
 **Path**: `app/xuanwu/db/`
