@@ -19,6 +19,7 @@ attachment visibility.
 - Added runtime attachment-path hints to prompt building for deterministic export flow
 - Added artifact SSE event emission and artifact download URLs
 - Added explicit `present_files` tool for selecting which generated files are exported
+- Added built-in document exporters: `export_docx`, `export_pptx`, `export_pdf`
 - Added frontend upload entry on the chat page
 - Added bottom attachment strip with uploads and outputs
 - Added assistant-message artifact links

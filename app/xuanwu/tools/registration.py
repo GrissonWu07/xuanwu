@@ -18,6 +18,21 @@ _TOOL_REGISTRY: dict[str, tuple[ToolMetadata, str, str]] = {
         "app.xuanwu.tools.filesystem.present_tool",
         "present_files_tool",
     ),
+    "export_docx": (
+        ToolMetadata(name="export_docx", description="Export text content to DOCX", group="fs"),
+        "app.xuanwu.tools.filesystem.export_tools",
+        "export_docx_tool",
+    ),
+    "export_pptx": (
+        ToolMetadata(name="export_pptx", description="Export content to PPTX", group="fs"),
+        "app.xuanwu.tools.filesystem.export_tools",
+        "export_pptx_tool",
+    ),
+    "export_pdf": (
+        ToolMetadata(name="export_pdf", description="Export text content to PDF", group="fs"),
+        "app.xuanwu.tools.filesystem.export_tools",
+        "export_pdf_tool",
+    ),
     "browser": (
         ToolMetadata(name="browser", description="Browser automation", group="ui"),
         "app.xuanwu.tools.ui.browser_tool",

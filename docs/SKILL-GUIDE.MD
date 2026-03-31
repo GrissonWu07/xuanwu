@@ -684,14 +684,14 @@ export LOG_LEVEL=DEBUG
 
 Query loaded Skills:
 ```bash
-curl http://localhost:8000/api/skills
+curl http://localhost:9000/api/skills
 ```
 
 #### Test Skill Directly
 
 Test Skill via API:
 ```bash
-curl -X POST http://localhost:8000/api/skills/execute \
+curl -X POST http://localhost:9000/api/skills/execute \
   -H "Content-Type: application/json" \
   -d '{"skill": "my-skill", "params": {}}'
 ```

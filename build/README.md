@@ -225,7 +225,7 @@ docker compose up -d
 ### 6. Verify Deployment
 
 ```bash
-curl http://localhost:8000/api/health
+curl http://localhost:9000/api/health
 ```
 
 Expected response:
@@ -233,7 +233,7 @@ Expected response:
 {"status": "healthy", "timestamp": "2026-03-23T10:00:00+00:00"}
 ```
 
-Access the web UI at: `http://your-server-ip:8000`
+Access the web UI at: `http://your-server-ip:9000`
 
 ---
 
@@ -393,7 +393,7 @@ Edit `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "8080:8000"  # Change 8080 to your preferred port
+  - "8080:9000"  # Change 8080 to your preferred port
 ```
 
 ### Permission Denied

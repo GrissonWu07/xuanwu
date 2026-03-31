@@ -128,3 +128,24 @@ Current chat UX presents files in two places:
 - persistent attachment strip below chat input (uploads + artifacts)
 
 This keeps chat as the primary interaction surface while allowing revisit/download.
+
+## 8. Built-in Export Tools
+
+XuanWu now provides built-in document export tools:
+
+- `export_docx`
+- `export_pptx`
+- `export_pdf`
+
+Design principles:
+
+- output path is resolved inside user `work_dir` with scope guard
+- missing extension auto-appends (`.docx` / `.pptx` / `.pdf`)
+- when `auto_present=true` (default), tool attempts `present_files` automatically
+- in a thread run context, this makes generated documents visible as downloadable artifacts
+
+Suggested runtime usage:
+
+1. generate document in current thread workspace/output path
+2. rely on auto-present (or call `present_files` explicitly for multiple files)
+3. let run finalizer emit SSE artifact events with signed link

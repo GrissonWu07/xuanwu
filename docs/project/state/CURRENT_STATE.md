@@ -33,6 +33,7 @@ runs rather than replace the chat surface as the primary interaction model.
   - runtime attachment prompt injection
   - runtime attachment-path/export hints in system prompt
   - explicit `present_files` artifact selection tool
+  - built-in `export_docx` / `export_pptx` / `export_pdf` tools
   - artifact SSE events
   - chat upload entry and bottom attachment strip
 

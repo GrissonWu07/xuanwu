@@ -4,7 +4,7 @@
  */
 
 jest.mock('../../app/frontend/scripts/config.js', () => ({
-    buildApiUrl: (path) => `http://127.0.0.1:8000${path}`
+    buildApiUrl: (path) => `http://127.0.0.1:9000${path}`
 }));
 
 jest.mock('../../app/frontend/scripts/i18n.js', () => ({

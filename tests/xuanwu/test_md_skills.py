@@ -795,6 +795,9 @@ class TestBuiltinToolHardening:
         for tool_name in ("read", "write", "edit", "delete_file", "exec", "process"):
             assert tool_name not in tools
         assert "present_files" in tools
+        assert "export_docx" in tools
+        assert "export_pptx" in tools
+        assert "export_pdf" in tools
 
     def test_register_builtin_tools_excludes_high_risk_tools(self):
         reg = SkillRegistry()
@@ -805,3 +808,9 @@ class TestBuiltinToolHardening:
             assert reg.get(tool_name) is None
         assert "present_files" in registered
         assert reg.get("present_files") is not None
+        assert "export_docx" in registered
+        assert reg.get("export_docx") is not None
+        assert "export_pptx" in registered
+        assert reg.get("export_pptx") is not None
+        assert "export_pdf" in registered
+        assert reg.get("export_pdf") is not None

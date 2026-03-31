@@ -126,12 +126,12 @@ ANTHROPIC_API_KEY=your-api-key
 **Step 3 — Start the service**
 
 ```bash
-uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 9000
 ```
 
 **Step 4 — Open the Web UI**
 
-Navigate to `http://127.0.0.1:8000` in your browser.
+Navigate to `http://127.0.0.1:9000` in your browser.
 
 ---
 
@@ -247,19 +247,19 @@ Configured under the `auth` section. See [Section 9](#9-authentication) for full
 ### Development Mode (with hot reload)
 
 ```bash
-uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 9000
 ```
 
 ### Production Mode
 
 ```bash
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --workers 4
 ```
 
 ### Using Gunicorn
 
 ```bash
-gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:9000
 ```
 
 ### Successful Startup Log
@@ -289,7 +289,7 @@ gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.
 ### Access URL
 
 ```
-http://127.0.0.1:8000
+http://127.0.0.1:9000
 ```
 
 ### Features
@@ -305,9 +305,9 @@ The frontend reads its API base URL from `/config.json` at startup. For cross-or
 
 ```bash
 # Tells the frontend where to send API requests
-UNICLAW_API_BASE_URL=http://192.168.88.4:8000
+UNICLAW_API_BASE_URL=http://192.168.88.4:9000
 # Allow the embedding platform's origin
-CORS_ORIGINS=http://192.168.88.4:8000,http://172.16.0.93
+CORS_ORIGINS=http://192.168.88.4:9000,http://172.16.0.93
 ```
 
 ### Frontend Development
@@ -329,8 +329,8 @@ npm run build:dev  # development bundle with sourcemaps
 
 After the service starts, interactive API docs are available at:
 
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
+- Swagger UI: `http://127.0.0.1:9000/docs`
+- ReDoc: `http://127.0.0.1:9000/redoc`
 
 All API paths are prefixed with `/api`.
 
@@ -950,7 +950,7 @@ npm test
 
 ```bash
 export LOG_LEVEL=DEBUG
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --reload
 ```
 
 ### 11.5 Adding a Custom Skill
@@ -966,10 +966,10 @@ See [SKILL-GUIDE.MD](./SKILL-GUIDE.MD) for the complete guide.
 
 ```bash
 # List all registered skills
-curl http://localhost:8000/api/skills
+curl http://localhost:9000/api/skills
 
 # Test a skill directly
-curl -X POST http://localhost:8000/api/skills/execute \
+curl -X POST http://localhost:9000/api/skills/execute \
   -H "Content-Type: application/json" \
   -d '{"skill_name": "my-skill", "args": {}}'
 ```

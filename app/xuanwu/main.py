@@ -9,7 +9,7 @@ This module creates and configures the FastAPI application, including:
 - Health check endpoint
 
 Usage:
-    uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000
+    uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000
 """
 
 import asyncio
@@ -490,8 +490,8 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:8000",
-            "http://127.0.0.1:8000",
+            "http://localhost:9000",
+            "http://127.0.0.1:9000",
             "http://localhost:3000",
             "http://127.0.0.1:3000",
         ],
@@ -541,6 +541,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.xuanwu.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=9000,
         reload=True,
     )

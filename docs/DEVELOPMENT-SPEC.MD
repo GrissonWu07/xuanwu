@@ -1321,7 +1321,7 @@ $env:NO_PROXY="*"
 $env:XUANWU_CONFIG="xuanwu.json"
 
 # Run development server
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --reload
 ```
 
 **Production mode**:
@@ -1330,17 +1330,17 @@ export NO_PROXY="*"
 export XUANWU_CONFIG="xuanwu.json"
 
 # Run with multiple workers
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --workers 4
 ```
 
 **Using Gunicorn**:
 ```bash
-gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:9000
 ```
 
 **Verify deployment**:
 ```bash
-curl http://localhost:8000/api/health
+curl http://localhost:9000/api/health
 # Expected: {"status": "healthy"}
 ```
 
@@ -1370,14 +1370,14 @@ COPY alembic.ini .
 RUN mkdir -p /app/data
 
 # Expose port
-EXPOSE 8000
+EXPOSE 9000
 
 # Health check (note: /api/health is the correct endpoint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+    CMD curl -f http://localhost:9000/api/health || exit 1
 
 # Run migrations and start server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000"]
 ```
 
 ```bash
@@ -1387,7 +1387,7 @@ docker build -f docker/Dockerfile -t xuanwu-core .
 # Run with config
 docker run -d \
   --name xuanwu \
-  -p 8000:8000 \
+  -p 9000:9000 \
   -v $(pwd)/xuanwu.json:/app/xuanwu.json:ro \
   -e XUANWU_ENCRYPTION_KEY=your-key \
   xuanwu-core
@@ -1405,7 +1405,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "8000:8000"
+      - "9000:9000"
     environment:
       - XUANWU_ENCRYPTION_KEY=${XUANWU_ENCRYPTION_KEY:-change-me-in-production}
     volumes:
@@ -1413,7 +1413,7 @@ services:
       - xuanwu-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1433,7 +1433,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "8000:8000"
+      - "9000:9000"
     environment:
       - XUANWU_ENCRYPTION_KEY=${XUANWU_ENCRYPTION_KEY:-change-me-in-production}
       - DB_HOST=mysql
@@ -1449,7 +1449,7 @@ services:
       - xuanwu-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1495,7 +1495,7 @@ export MYSQL_PASSWORD=your-password
 alembic upgrade head
 
 # Start service
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000
 ```
 
 **Migration Files**:
@@ -1512,7 +1512,7 @@ server {
     server_name your-domain.com;
 
     location / {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://localhost:9000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -1525,7 +1525,7 @@ server {
 
     # SSE endpoint — disable buffering
     location /api/agent/runs/ {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://localhost:9000;
         proxy_http_version 1.1;
         proxy_set_header Connection '';
         proxy_buffering off;
@@ -1555,7 +1555,7 @@ WorkingDirectory=/opt/xuanwu/XuanWu-Core
 Environment="PATH=/opt/xuanwu/venv/bin"
 Environment="NO_PROXY=*"
 Environment="XUANWU_CONFIG=/opt/xuanwu/XuanWu-Core/xuanwu.json"
-ExecStart=/opt/xuanwu/venv/bin/uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --workers 4
+ExecStart=/opt/xuanwu/venv/bin/uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --workers 4
 Restart=always
 RestartSec=5
 
@@ -1625,7 +1625,7 @@ sudo systemctl start xuanwu
 
 **Port already in use**:
 ```bash
-lsof -i :8000       # Find process
+lsof -i :9000       # Find process
 kill -9 <PID>        # Kill it
 # Or use a different port:
 uvicorn app.xuanwu.main:app --port 8080
@@ -1646,15 +1646,15 @@ curl -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
 **Debug mode**:
 ```bash
 export LOG_LEVEL=DEBUG
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --reload
 ```
 
 ### 12.9 Monitoring & Backup
 
 **Health check**:
 ```bash
-curl http://localhost:8000/api/health
-curl http://localhost:8000/api/health?detailed=true
+curl http://localhost:9000/api/health
+curl http://localhost:9000/api/health?detailed=true
 ```
 
 **Backup**:

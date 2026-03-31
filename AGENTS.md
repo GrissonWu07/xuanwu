@@ -8,7 +8,7 @@ Coding guidelines for AI assistants working on the XuanWu enterprise agent frame
 
 ```bash
 # Run the service
-uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 9000
 
 # Run all tests
 pytest tests/xuanwu -q

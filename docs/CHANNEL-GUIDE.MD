@@ -95,7 +95,7 @@ Channel traffic must build canonical `SessionKey` values instead of ad-hoc strin
 Before enabling a connection, you can verify that your credentials are correct:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/{type}/connections/{id}/verify"
+curl -X POST "http://localhost:9000/api/channels/{type}/connections/{id}/verify"
 ```
 
 **Response (Success):**
@@ -126,7 +126,7 @@ XuanWu provides a web-based interface for managing channel connections without u
 
 Navigate to:
 ```
-http://your-host:8000/channels.html
+http://your-host:9000/channels.html
 ```
 
 ### Features
@@ -252,7 +252,7 @@ From your app's **"Credentials & Basic Info"** page, copy:
 Create a connection using the API:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
+curl -X POST "http://localhost:9000/api/channels/feishu/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Feishu Bot",
@@ -293,7 +293,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
 For webhook mode, you would need a publicly accessible URL:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
+curl -X POST "http://localhost:9000/api/channels/feishu/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Feishu Webhook Bot",
@@ -376,7 +376,7 @@ The complete schema returned by `GET /api/channels/feishu/schema`:
 #### Enable the Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections/{connection_id}/enable"
+curl -X POST "http://localhost:9000/api/channels/feishu/connections/{connection_id}/enable"
 ```
 
 **Response:**
@@ -397,7 +397,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections/{connection_
 #### Verify Connection Status
 
 ```bash
-curl "http://localhost:8000/api/channels/feishu/connections/{connection_id}"
+curl "http://localhost:9000/api/channels/feishu/connections/{connection_id}"
 ```
 
 ### Troubleshooting
@@ -491,7 +491,7 @@ From your app's **"Basic Information"** or **"Robot"** settings, copy:
 #### Stream Mode (Recommended)
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/dingtalk/connections" \
+curl -X POST "http://localhost:9000/api/channels/dingtalk/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My DingTalk Bot",
@@ -518,7 +518,7 @@ curl -X POST "http://localhost:8000/api/channels/dingtalk/connections" \
 For webhook mode with optional signature verification:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/dingtalk/connections" \
+curl -X POST "http://localhost:9000/api/channels/dingtalk/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "DingTalk Webhook Bot",
@@ -620,7 +620,7 @@ If the session webhook has expired and no custom webhook is configured, the repl
 #### Enable the Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/dingtalk/connections/{connection_id}/enable"
+curl -X POST "http://localhost:9000/api/channels/dingtalk/connections/{connection_id}/enable"
 ```
 
 #### Test Message Flow
@@ -711,7 +711,7 @@ If using Application API mode:
 #### WebSocket Mode (Recommended)
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
+curl -X POST "http://localhost:9000/api/channels/wecom/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My WeCom Bot",
@@ -736,7 +736,7 @@ curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
 #### Webhook Mode
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
+curl -X POST "http://localhost:9000/api/channels/wecom/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "WeCom Webhook Bot",
@@ -759,7 +759,7 @@ curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
 For full bidirectional messaging via the WeCom API:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
+curl -X POST "http://localhost:9000/api/channels/wecom/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "WeCom App Bot",
@@ -873,7 +873,7 @@ The complete schema returned by `GET /api/channels/wecom/schema`:
 #### Enable the Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/wecom/connections/{connection_id}/enable"
+curl -X POST "http://localhost:9000/api/channels/wecom/connections/{connection_id}/enable"
 ```
 
 #### Test Message Flow
@@ -921,7 +921,7 @@ A: Yes. You can create multiple connections for the same platform (e.g., multipl
 
 A: Use the `/verify` endpoint to test your credentials:
 ```bash
-curl -X POST "http://localhost:8000/api/channels/{type}/connections/{id}/verify"
+curl -X POST "http://localhost:9000/api/channels/{type}/connections/{id}/verify"
 ```
 This validates your configuration without connecting or sending messages.
 
@@ -937,7 +937,7 @@ A: All sensitive credentials (app secrets, tokens) are encrypted using AES-256-G
 
 A: Yes. Use the PATCH API or the Web UI Edit function to update the configuration:
 ```bash
-curl -X PATCH "http://localhost:8000/api/channels/{type}/connections/{id}" \
+curl -X PATCH "http://localhost:9000/api/channels/{type}/connections/{id}" \
   -H "Content-Type: application/json" \
   -d '{
     "config": {
@@ -1005,7 +1005,7 @@ The GET endpoint handles challenge verification for platforms like Feishu that r
 #### List Channel Types
 
 ```bash
-curl "http://localhost:8000/api/channels"
+curl "http://localhost:9000/api/channels"
 ```
 
 **Response:**
@@ -1038,7 +1038,7 @@ curl "http://localhost:8000/api/channels"
 #### Get Configuration Schema
 
 ```bash
-curl "http://localhost:8000/api/channels/feishu/schema"
+curl "http://localhost:9000/api/channels/feishu/schema"
 ```
 
 **Response:** See platform-specific Configuration Schema sections above.
@@ -1046,7 +1046,7 @@ curl "http://localhost:8000/api/channels/feishu/schema"
 #### Create Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
+curl -X POST "http://localhost:9000/api/channels/feishu/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Production Bot",
@@ -1076,7 +1076,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
 #### Verify Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4/verify"
+curl -X POST "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4/verify"
 ```
 
 **Response (Success):**
@@ -1098,7 +1098,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d
 #### Enable Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4/enable"
+curl -X POST "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4/enable"
 ```
 
 **Response:**
@@ -1112,7 +1112,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d
 #### Disable Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4/disable"
+curl -X POST "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4/disable"
 ```
 
 **Response:**
@@ -1126,7 +1126,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d
 #### Update Connection
 
 ```bash
-curl -X PATCH "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4" \
+curl -X PATCH "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Renamed Bot",
@@ -1141,7 +1141,7 @@ curl -X PATCH "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3
 #### Delete Connection
 
 ```bash
-curl -X DELETE "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4"
+curl -X DELETE "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4"
 ```
 
 **Response:**

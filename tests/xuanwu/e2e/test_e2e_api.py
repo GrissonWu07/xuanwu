@@ -22,7 +22,7 @@ pytestmark = pytest.mark.e2e
 
 
 # 测试服务地址
-TEST_SERVER_URL = os.environ.get("TEST_SERVER_URL", "http://127.0.0.1:8000")
+TEST_SERVER_URL = os.environ.get("TEST_SERVER_URL", "http://127.0.0.1:9000")
 
 
 @pytest.fixture(scope="module")

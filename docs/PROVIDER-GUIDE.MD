@@ -823,17 +823,17 @@ Review application logs:
 #### List Available Skills
 
 ```bash
-curl http://localhost:8000/api/skills | grep my-provider
+curl http://localhost:9000/api/skills | grep my-provider
 ```
 
 #### Test Provider
 
 ```bash
 # List configured instances
-curl http://localhost:8000/api/providers/my-provider/instances
+curl http://localhost:9000/api/providers/my-provider/instances
 
 # Execute a Skill
-curl -X POST http://localhost:8000/api/skills/execute \
+curl -X POST http://localhost:9000/api/skills/execute \
   -H "Content-Type: application/json" \
   -d '{
     "skill": "my-provider/my-skill",

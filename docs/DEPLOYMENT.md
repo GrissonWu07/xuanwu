@@ -95,7 +95,7 @@ services:
     image: xuanwu-core:latest
     container_name: xuanwu
     ports:
-      - "8000:8000"
+      - "9000:9000"
     volumes:
       - ./config/xuanwu.json:/app/xuanwu.json:ro
       - ./data:/app/data
@@ -105,7 +105,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -154,7 +154,7 @@ docker-compose exec xuanwu alembic upgrade head
 docker-compose ps
 
 # Health check
-curl http://localhost:8000/api/health
+curl http://localhost:9000/api/health
 # Expected: {"status": "healthy", "timestamp": "..."}
 ```
 

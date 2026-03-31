@@ -46,6 +46,10 @@ class _StreamingRunner:
             work_dir = Path(str(deps.extra["work_dir"]))
             work_dir.mkdir(parents=True, exist_ok=True)
             (work_dir / "generated-report.md").write_text("# Generated", encoding="utf-8")
+        if user_message == "summarize-pdf":
+            work_dir = Path(str(deps.extra["work_dir"]))
+            work_dir.mkdir(parents=True, exist_ok=True)
+            (work_dir / "generated-report.pdf").write_bytes(b"%PDF-1.7\n%XuanWu")
         yield StreamEvent.lifecycle_start()
         yield StreamEvent.assistant_delta(f"reply:{user_message}")
         yield StreamEvent.lifecycle_end()
@@ -162,3 +166,29 @@ def test_agent_run_injects_attachment_context_and_streams_artifacts(tmp_path):
     attachment_context = client._runner.last_extra["attachment_context"]
     assert attachment_context["uploads"][0]["filename"] == "notes.txt"
     assert attachment_context["uploads"][0]["injection_mode"] == "full"
+
+
+def test_agent_run_streams_pdf_artifact_with_signed_download_link(tmp_path):
+    client = _build_client(tmp_path)
+
+    session = client.post("/api/sessions/threads", json={"channel": "web", "chat_type": "dm"})
+    assert session.status_code == 200
+    session_key = session.json()["session_key"]
+
+    run = client.post(
+        "/api/agent/run",
+        json={"session_key": session_key, "message": "summarize-pdf", "timeout_seconds": 30},
+    )
+    assert run.status_code == 200
+    run_id = run.json()["run_id"]
+
+    with client.stream("GET", f"/api/agent/runs/{run_id}/stream") as response:
+        assert response.status_code == 200
+        events = _parse_sse_events("".join(response.iter_text()))
+
+    artifact_payload = next(payload for event_type, payload in events if event_type == "artifact")
+    assert artifact_payload["name"] == "generated-report.pdf"
+    assert artifact_payload["download_url"].startswith("/api/sessions/")
+    artifact_query = parse_qs(urlparse(artifact_payload["download_url"]).query)
+    assert "expires_at" in artifact_query
+    assert "sig" in artifact_query

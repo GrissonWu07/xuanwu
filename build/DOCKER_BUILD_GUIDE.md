@@ -259,7 +259,7 @@ Edit `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "8080:8000"
+  - "8080:9000"
 ```
 
 ### Permission Denied
