@@ -483,8 +483,8 @@ class TestSkillRegistryMdLoading:
         assert "name" not in entry_meta
         assert "description" not in entry_meta
 
-    def test_script_backed_md_tool_disabled_by_default(self, tmp_path):
-        """Script-backed markdown tools should not register unless explicitly enabled."""
+    def test_script_backed_md_tool_registers_by_default(self, tmp_path):
+        """Script-backed markdown tools should register by default."""
         skill_dir = tmp_path / "script-skill"
         _write_skill_md(
             skill_dir / "SKILL.md",
@@ -500,10 +500,10 @@ class TestSkillRegistryMdLoading:
         reg = SkillRegistry()
         reg.load_from_directory(str(tmp_path), location="workspace")
 
-        assert reg.get("script_tool") is None
+        assert reg.get("script_tool") is not None
 
     def test_explicit_python_handler_md_tool_still_registers(self, tmp_path):
-        """Explicit callable handlers remain available without script execution."""
+        """Explicit callable handlers remain available."""
         skill_dir = tmp_path / "callable-skill"
         _write_skill_md(
             skill_dir / "SKILL.md",
@@ -765,7 +765,6 @@ class TestConfigSchema:
         assert cfg.md_skills_desc_max_chars == 200
         assert cfg.md_skills_index_max_chars == 3000
         assert cfg.md_skills_max_file_bytes == 262144
-        assert cfg.allow_script_execution is True
 
     def test_custom_values(self):
         """自定义值验证"""
