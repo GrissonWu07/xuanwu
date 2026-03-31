@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from typing import Dict, Any
@@ -27,7 +28,7 @@ class TestFeishuHandler:
         assert FeishuHandler.channel_name == "Feishu"
         assert FeishuHandler.channel_mode == ChannelMode.BIDIRECTIONAL
         assert FeishuHandler.supports_long_connection is True
-        assert FeishuHandler.supports_webhook is False
+        assert FeishuHandler.supports_webhook is True
 
     def test_handler_init(self):
         """Test handler initialization."""
@@ -68,6 +69,17 @@ class TestFeishuHandler:
         }
         result = await handler.setup(config)
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_setup_webhook_mode_without_app_credentials(self):
+        """Webhook mode should not require app_id/app_secret."""
+        handler = FeishuHandler()
+        config = {
+            "connection_mode": "webhook",
+            "webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/xxx",
+        }
+        result = await handler.setup(config)
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_validate_config_valid(self):
@@ -194,6 +206,116 @@ class TestFeishuHandler:
         
         assert message is not None
         assert message.content == "Hello from JSON"
+
+    @pytest.mark.asyncio
+    async def test_handle_inbound_wrapped_request_data(self):
+        """Test handling inbound message from channel_hooks wrapped payload."""
+        handler = FeishuHandler()
+        request = {
+            "headers": {"content-type": "application/json"},
+            "query_params": {},
+            "body": {
+                "header": {"event_type": "im.message.receive_v1"},
+                "event": {
+                    "message": {
+                        "message_id": "msg_wrapped",
+                        "chat_id": "chat_wrapped",
+                        "chat_type": "p2p",
+                        "content": json.dumps({"text": "Wrapped payload"}),
+                    },
+                    "sender": {
+                        "sender_id": {"open_id": "user_wrapped"},
+                    },
+                },
+            },
+        }
+
+        message = await handler.handle_inbound(request)
+
+        assert message is not None
+        assert message.message_id == "msg_wrapped"
+        assert message.content == "Wrapped payload"
+
+    @pytest.mark.asyncio
+    async def test_handle_inbound_webhook_verification_token_mismatch(self):
+        """Webhook inbound should be rejected when verification token mismatches."""
+        handler = FeishuHandler({"verification_token": "expected-token"})
+        payload = {
+            "header": {"event_type": "im.message.receive_v1"},
+            "event": {
+                "message": {
+                    "message_id": "msg_wrapped",
+                    "chat_id": "chat_wrapped",
+                    "chat_type": "p2p",
+                    "content": json.dumps({"text": "Wrapped payload"}),
+                },
+                "sender": {
+                    "sender_id": {"open_id": "user_wrapped"},
+                },
+            },
+            "token": "wrong-token",
+        }
+        request = {
+            "headers": {"content-type": "application/json"},
+            "query_params": {},
+            "raw_body": json.dumps(payload),
+            "body": payload,
+        }
+        message = await handler.handle_inbound(request)
+        assert message is None
+
+    @pytest.mark.asyncio
+    async def test_handle_inbound_webhook_signature_valid(self):
+        """Webhook inbound should pass when signature is valid."""
+        encrypt_key = "encrypt-key"
+        handler = FeishuHandler({"encrypt_key": encrypt_key})
+        payload = {
+            "header": {"event_type": "im.message.receive_v1"},
+            "event": {
+                "message": {
+                    "message_id": "msg_sig",
+                    "chat_id": "chat_sig",
+                    "chat_type": "p2p",
+                    "content": json.dumps({"text": "Signed payload"}),
+                },
+                "sender": {
+                    "sender_id": {"open_id": "user_sig"},
+                },
+            },
+        }
+        raw_body = json.dumps(payload, separators=(",", ":"))
+        timestamp = "1710000000"
+        nonce = "nonce123"
+        signature = hashlib.sha256(
+            (timestamp + nonce + encrypt_key).encode("utf-8") + raw_body.encode("utf-8")
+        ).hexdigest()
+        request = {
+            "headers": {
+                "content-type": "application/json",
+                "x-lark-request-timestamp": timestamp,
+                "x-lark-request-nonce": nonce,
+                "x-lark-signature": signature,
+            },
+            "query_params": {},
+            "raw_body": raw_body,
+            "body": payload,
+        }
+        message = await handler.handle_inbound(request)
+        assert message is not None
+        assert message.message_id == "msg_sig"
+
+    @pytest.mark.asyncio
+    async def test_connect_webhook_mode_marks_connected_without_sdk(self):
+        """Webhook mode should not start SDK process and should connect immediately."""
+        handler = FeishuHandler(
+            {
+                "connection_mode": "webhook",
+                "webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/xxx",
+            }
+        )
+        result = await handler.connect()
+        assert result is True
+        assert handler.get_status() == ConnectionStatus.CONNECTED
 
     @pytest.mark.asyncio
     async def test_handle_inbound_wrong_event_type(self):

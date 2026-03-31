@@ -31,7 +31,7 @@ XuanWu supports multiple connection modes for IM platform integration:
 | Feature | Feishu | DingTalk | WeCom |
 |---------|--------|----------|-------|
 | Long Connection / Stream | Yes (SDK) | Yes (Stream) | Yes (WebSocket) |
-| Webhook | Planned | Yes | Yes |
+| Webhook | Yes | Yes | Yes |
 | Application API | No | No | Yes |
 | Streaming Reply | No | No | Yes |
 | Markdown Support | Limited | No | Yes |
@@ -186,14 +186,14 @@ You can use **either** the Web UI **or** the API to manage connections - both wo
 
 ### Overview
 
-Feishu (also known as Lark internationally) integration currently supports Long Connection mode only.
+Feishu (also known as Lark internationally) integration supports both Long Connection and Webhook modes.
 
 | Mode | Config Key | Description | Status |
 |------|------------|-------------|--------|
 | **Long Connection** (Recommended) | `longconnection` | WebSocket-based, real-time, no callback URL needed | Supported |
-| **Webhook** | `webhook` | HTTP callback, requires public URL | **Planned - Not Yet Implemented** |
+| **Webhook** | `webhook` | HTTP callback, requires public URL | Supported |
 
-> **Note:** Webhook mode is planned but not yet implemented in the current codebase. The schema includes webhook fields for forward compatibility, but only Long Connection mode is functional. If you need webhook functionality, please use DingTalk or WeCom.
+> **Note:** In Webhook mode, inbound messages are received via `/api/channel-hooks/feishu/{connection_id}` and outbound replies are sent through the configured `webhook_url`.
 
 **Dependency:** `lark-oapi >= 1.5.0` (for Long Connection mode)
 
@@ -286,9 +286,7 @@ curl -X POST "http://localhost:9000/api/channels/feishu/connections" \
 | `app_id` | Yes | Feishu App ID (starts with `cli_`) |
 | `app_secret` | Yes | Feishu App Secret |
 
-#### Webhook Mode (Planned - Not Yet Implemented)
-
-> **Warning:** This mode is not yet functional. The configuration is documented here for future reference only.
+#### Webhook Mode
 
 For webhook mode, you would need a publicly accessible URL:
 
@@ -304,12 +302,15 @@ curl -X POST "http://localhost:9000/api/channels/feishu/connections" \
   }'
 ```
 
-**Configuration Fields (Future):**
+**Configuration Fields:**
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `connection_mode` | Yes | Set to `webhook` |
 | `webhook_url` | Yes | Your public webhook URL |
+| `verification_token` | No | Validate inbound callback `token` when provided |
+| `encrypt_key` | No | Validate inbound `X-Lark-Signature` when provided |
+| `require_at_mention_in_group` | No | If `true`, group messages are processed only when bot is @mentioned |
 
 ### Configuration Schema
 

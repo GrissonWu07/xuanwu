@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import multiprocessing
 import queue
+import re
+import secrets
 import threading
 import time
 from typing import Any, Callable, Dict, Optional
@@ -25,6 +28,38 @@ from ..models import (
 )
 
 logger = logging.getLogger(__name__)
+_AT_TAG_PATTERN = re.compile(r"<at\b[^>]*>", re.IGNORECASE)
+
+
+def _extract_text_and_mention(content: Any) -> tuple[str, bool]:
+    """Extract plain text and whether content contains mention markers."""
+    has_mention = False
+    text = ""
+
+    if isinstance(content, str):
+        text = content
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                parsed_text = parsed.get("text")
+                if isinstance(parsed_text, str) and parsed_text:
+                    text = parsed_text
+                mentions = parsed.get("mentions") or parsed.get("at_users")
+                has_mention = bool(mentions)
+        except Exception:
+            pass
+    elif isinstance(content, dict):
+        parsed_text = content.get("text")
+        text = parsed_text if isinstance(parsed_text, str) else str(content)
+        mentions = content.get("mentions") or content.get("at_users")
+        has_mention = bool(mentions)
+    else:
+        text = str(content)
+
+    if not has_mention and isinstance(text, str):
+        has_mention = bool(_AT_TAG_PATTERN.search(text))
+
+    return text, has_mention
 
 
 def _run_feishu_sdk_process(
@@ -55,15 +90,7 @@ def _run_feishu_sdk_process(
             sender = data.event.sender
             
             # Parse content
-            content = message.content
-            if message.message_type == "text":
-                try:
-                    content_obj = json.loads(content)
-                    text = content_obj.get("text", "")
-                except:
-                    text = content
-            else:
-                text = content
+            text, has_mention = _extract_text_and_mention(message.content)
             
             # Send to queue as dict
             msg_data = {
@@ -75,6 +102,7 @@ def _run_feishu_sdk_process(
                 "content_type": message.message_type,
                 "create_time": message.create_time,
                 "tenant_key": sender.tenant_key,
+                "has_mention": has_mention,
             }
             message_queue.put(msg_data)
             print(f"[Feishu SDK Process] Message received: {text[:50]}...")
@@ -132,7 +160,7 @@ class FeishuHandler(ChannelHandler):
     channel_icon = "feishu"
     channel_mode = ChannelMode.BIDIRECTIONAL
     supports_long_connection = True
-    supports_webhook = False
+    supports_webhook = True
     
     # Feishu API endpoints
     FEISHU_API_BASE = "https://open.feishu.cn/open-apis"
@@ -153,14 +181,20 @@ class FeishuHandler(ChannelHandler):
         """Initialize handler with configuration."""
         try:
             self.config.update(connection_config)
-            
+            connection_mode = self.config.get("connection_mode", "longconnection")
+            if connection_mode == "webhook":
+                if not self.config.get("webhook_url"):
+                    logger.error("Feishu webhook_url is required for webhook mode")
+                    return False
+                return True
+
             if not self.config.get("app_id"):
                 logger.error("Feishu app_id is required")
                 return False
             if not self.config.get("app_secret"):
                 logger.error("Feishu app_secret is required")
                 return False
-            
+
             return True
         except Exception as e:
             logger.error(f"Feishu setup failed: {e}")
@@ -223,6 +257,12 @@ class FeishuHandler(ChannelHandler):
     async def connect(self) -> bool:
         """Establish connection using multiprocessing."""
         try:
+            connection_mode = self.config.get("connection_mode", "longconnection")
+            if connection_mode == "webhook":
+                logger.info("Feishu webhook mode enabled (no SDK long connection needed)")
+                self._status = ConnectionStatus.CONNECTED
+                return True
+
             app_id = self.config.get("app_id")
             app_secret = self.config.get("app_secret")
             
@@ -321,6 +361,7 @@ class FeishuHandler(ChannelHandler):
                         "chat_type": msg_data["chat_type"],
                         "create_time": msg_data["create_time"],
                         "tenant_key": msg_data["tenant_key"],
+                        "has_mention": msg_data.get("has_mention", False),
                     },
                 )
                 
@@ -458,6 +499,56 @@ class FeishuHandler(ChannelHandler):
         except Exception as e:
             logger.error(f"Failed to refresh Feishu access token: {e}")
             return False
+
+    def _verify_webhook_security(
+        self,
+        *,
+        headers: Dict[str, Any],
+        payload: Dict[str, Any],
+        raw_body: str,
+    ) -> bool:
+        """Verify Feishu webhook token/signature when configured."""
+        verification_token = self.config.get("verification_token")
+        if verification_token:
+            incoming_token = payload.get("token")
+            if incoming_token and not secrets.compare_digest(
+                str(incoming_token), str(verification_token)
+            ):
+                logger.error("Feishu webhook verification token mismatch")
+                return False
+
+        encrypt_key = self.config.get("encrypt_key")
+        if not encrypt_key:
+            return True
+
+        header_map = {str(k).lower(): str(v) for k, v in (headers or {}).items()}
+        timestamp = header_map.get("x-lark-request-timestamp")
+        nonce = header_map.get("x-lark-request-nonce")
+        signature = header_map.get("x-lark-signature")
+        if not (timestamp and nonce and signature):
+            logger.error("Feishu webhook signature headers missing")
+            return False
+
+        digest = hashlib.sha256(
+            (timestamp + nonce + str(encrypt_key)).encode("utf-8") + raw_body.encode("utf-8")
+        ).hexdigest()
+        if not secrets.compare_digest(digest, signature):
+            logger.error("Feishu webhook signature verification failed")
+            return False
+        return True
+
+    async def verify_webhook_request(self, request: Any) -> bool:
+        """Verify raw Feishu webhook request before challenge/event processing."""
+        if not isinstance(request, dict):
+            return False
+        body = request.get("body")
+        if not isinstance(body, dict):
+            return False
+        headers = request.get("headers") if isinstance(request.get("headers"), dict) else {}
+        raw_body = request.get("raw_body")
+        if not isinstance(raw_body, str):
+            raw_body = json.dumps(body, separators=(",", ":"))
+        return self._verify_webhook_security(headers=headers, payload=body, raw_body=raw_body)
     
     async def handle_inbound(self, request: Any) -> Optional[InboundMessage]:
         """Handle incoming message (for webhook fallback)."""
@@ -466,7 +557,34 @@ class FeishuHandler(ChannelHandler):
                 data = json.loads(request)
             else:
                 data = request
-            
+
+            headers: Dict[str, Any] = {}
+            raw_body = ""
+            if isinstance(data, dict) and "body" in data:
+                if isinstance(data.get("headers"), dict):
+                    headers = data.get("headers")
+                if isinstance(data.get("raw_body"), str):
+                    raw_body = data.get("raw_body")
+                body = data.get("body")
+                if isinstance(body, str):
+                    try:
+                        body = json.loads(body)
+                    except Exception:
+                        body = {}
+                if isinstance(body, dict):
+                    data = body
+
+            if not isinstance(data, dict):
+                return None
+            if not raw_body:
+                raw_body = json.dumps(data, separators=(",", ":"))
+
+            if not self._verify_webhook_security(headers=headers, payload=data, raw_body=raw_body):
+                return None
+
+            if "challenge" in data:
+                return None
+
             event_type = data.get("header", {}).get("event_type", "")
             if event_type != "im.message.receive_v1":
                 return None
@@ -475,15 +593,7 @@ class FeishuHandler(ChannelHandler):
             message = event_data.get("message", {})
             sender = event_data.get("sender", {})
             
-            content = message.get("content", "")
-            if isinstance(content, str):
-                try:
-                    content_obj = json.loads(content)
-                    text = content_obj.get("text", "")
-                except:
-                    text = content
-            else:
-                text = str(content)
+            text, has_mention = _extract_text_and_mention(message.get("content", ""))
             
             return InboundMessage(
                 message_id=message.get("message_id", ""),
@@ -497,6 +607,7 @@ class FeishuHandler(ChannelHandler):
                 metadata={
                     "chat_type": message.get("chat_type"),
                     "create_time": message.get("create_time"),
+                    "has_mention": has_mention,
                 },
             )
         except Exception as e:
@@ -521,6 +632,12 @@ class FeishuHandler(ChannelHandler):
         elif connection_mode == "webhook":
             if not config.get("webhook_url"):
                 errors.append("webhook_url is required for Webhook mode")
+            token = config.get("verification_token")
+            if token is not None and not str(token).strip():
+                errors.append("verification_token must not be empty when provided")
+            encrypt_key = config.get("encrypt_key")
+            if encrypt_key is not None and not str(encrypt_key).strip():
+                errors.append("encrypt_key must not be empty when provided")
         
         return ChannelValidationResult(valid=len(errors) == 0, errors=errors)
     
@@ -562,6 +679,26 @@ class FeishuHandler(ChannelHandler):
                     "description": "Custom bot Webhook address",
                     "placeholder": "https://open.feishu.cn/open-apis/bot/v2/hook/xxx",
                     "showWhen": {"connection_mode": "webhook"},
+                },
+                "verification_token": {
+                    "type": "string",
+                    "title": "Verification Token",
+                    "description": "Optional token to validate inbound webhook callbacks",
+                    "placeholder": "Verification token configured on Feishu platform",
+                    "showWhen": {"connection_mode": "webhook"},
+                },
+                "encrypt_key": {
+                    "type": "string",
+                    "title": "Encrypt Key",
+                    "description": "Optional encrypt key for X-Lark-Signature verification",
+                    "placeholder": "Encrypt key configured on Feishu platform",
+                    "showWhen": {"connection_mode": "webhook"},
+                },
+                "require_at_mention_in_group": {
+                    "type": "boolean",
+                    "title": "Require @ Mention In Group",
+                    "description": "Only process group messages when the bot is @mentioned",
+                    "default": False,
                 },
             },
             "required_by_mode": {

@@ -4,16 +4,30 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.xuanwu.channels.registry import ChannelRegistry
+from app.xuanwu.channels.manager import ChannelManager
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/channel-hooks", tags=["channel-hooks"])
+
+_channel_manager: Optional[ChannelManager] = None
+
+
+def set_channel_manager(manager: Optional[ChannelManager]) -> None:
+    """Set channel manager instance."""
+    global _channel_manager
+    _channel_manager = manager
+
+
+def get_channel_manager() -> Optional[ChannelManager]:
+    """Get channel manager instance if initialized."""
+    return _channel_manager
 
 
 @router.post("/{channel_type}/{connection_id}")
@@ -33,48 +47,59 @@ async def receive_channel_webhook(
         JSON response
     """
     try:
-        # Get handler class
         handler_class = ChannelRegistry.get(channel_type)
         if not handler_class:
             logger.error(f"Channel type not found: {channel_type}")
             raise HTTPException(status_code=404, detail=f"Channel type not found: {channel_type}")
-        
-        # Get handler instance
-        handler = ChannelRegistry.get_instance(connection_id)
-        if not handler:
-            # Try to create instance from connection config
-            # This requires ChannelManager to be available
-            logger.warning(f"Handler instance not found for: {connection_id}")
-            raise HTTPException(status_code=404, detail=f"Connection not found: {connection_id}")
-        
+
         # Parse request body
         body = await request.body()
         content_type = request.headers.get("content-type", "")
-        
+
         if "application/json" in content_type:
-            data = await request.json()
+            try:
+                data = await request.json()
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid JSON payload")
         else:
             data = {"body": body.decode("utf-8")}
-        
+
         # Add request metadata
         request_data = {
             "headers": dict(request.headers),
             "query_params": dict(request.query_params),
             "body": data,
+            "raw_body": body.decode("utf-8", errors="ignore"),
         }
-        
-        # Handle inbound message
-        inbound = await handler.handle_inbound(request_data)
-        
+
+        # Some platforms (including Feishu) send challenge in POST body.
+        if isinstance(data, dict) and "challenge" in data:
+            manager = get_channel_manager()
+            if manager is not None and channel_type == "feishu":
+                verified = await manager.verify_webhook_request(
+                    channel_type,
+                    connection_id,
+                    request_data,
+                )
+                if not verified:
+                    raise HTTPException(status_code=401, detail="Webhook signature verification failed")
+            return JSONResponse(content={"challenge": data["challenge"]})
+
+        manager = get_channel_manager()
+        if manager is not None:
+            inbound = await manager.route_inbound_message(channel_type, connection_id, request_data)
+        else:
+            # Backward-compatible fallback for isolated tests.
+            handler = ChannelRegistry.get_instance(connection_id)
+            if not handler:
+                logger.warning(f"Handler instance not found for: {connection_id}")
+                raise HTTPException(status_code=404, detail=f"Connection not found: {connection_id}")
+            inbound = await handler.handle_inbound(request_data)
+
         if not inbound:
             logger.warning(f"Failed to parse inbound message from {channel_type}")
             raise HTTPException(status_code=400, detail="Invalid message format")
-        
-        # TODO: Route to SessionManager
-        # from app.xuanwu.session.manager import get_session_manager
-        # session_manager = get_session_manager()
-        # await session_manager.handle_message(inbound)
-        
+
         return JSONResponse(content={"status": "ok", "message_id": inbound.message_id})
         
     except HTTPException:

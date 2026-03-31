@@ -28,7 +28,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.xuanwu.api.routes import create_router, APIContext, install_request_validation_logging, set_api_context
 from app.xuanwu.api.webhook_dispatch import WebhookDispatchManager
-from app.xuanwu.api.channel_hooks import router as channel_hooks_router
+from app.xuanwu.api.channel_hooks import (
+    router as channel_hooks_router,
+    set_channel_manager as set_channel_hooks_manager,
+)
 from app.xuanwu.api.channels import router as channels_router, set_channel_manager
 from app.xuanwu.api.agent_info import router as agent_info_router
 from app.xuanwu.api.api_routes import router as db_api_router
@@ -274,6 +277,7 @@ async def lifespan(app: FastAPI):
     # Initialize ChannelManager
     _channel_manager = ChannelManager(workspace_path)
     set_channel_manager(_channel_manager)
+    set_channel_hooks_manager(_channel_manager)
     print(f"[XuanWu] Channel manager initialized")
     
     # Scan providers for channel and auth extensions
