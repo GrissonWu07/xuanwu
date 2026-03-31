@@ -190,6 +190,11 @@ async def _collect_runtime_user_ids(
         if user_id and user_id not in {"default", "anonymous"}
     )
 
+
+def _resolve_builtin_skills_root() -> Path:
+    """Return built-in skills directory under application package."""
+    return (Path(__file__).resolve().parent / "skills").resolve()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
@@ -203,13 +208,16 @@ async def lifespan(app: FastAPI):
     providers_root = (config_root / config.providers_root).resolve()
     skills_root = (config_root / config.skills_root).resolve()
     channels_root = (config_root / config.channels_root).resolve()
+    builtin_skills_root = _resolve_builtin_skills_root()
 
     provider_plugins = scan_plugin_names(providers_root)
     skill_plugins = scan_plugin_names(skills_root, md_skill_mode=True)
     channel_plugins = scan_plugin_names(channels_root)
+    builtin_skill_plugins = scan_plugin_names(builtin_skills_root, md_skill_mode=True)
     print_root_plugins("providers_root plugins", providers_root, provider_plugins)
     print_root_plugins("skills_root plugins", skills_root, skill_plugins)
     print_root_plugins("channels_root plugins", channels_root, channel_plugins)
+    print_root_plugins("built-in skills plugins", builtin_skills_root, builtin_skill_plugins)
 
     # Get workspace path from config
     workspace_path = config.workspace.path
@@ -396,7 +404,11 @@ async def lifespan(app: FastAPI):
                         provider=provider_namespace
                     )
 
-    # 2. Standalone skills (from skills_root config)
+    # 2. Built-in skills (from app package)
+    if builtin_skills_root.exists():
+        _skill_registry.load_from_directory(str(builtin_skills_root), location="built-in")
+
+    # 3. Standalone skills (from skills_root config)
     if skills_root.exists():
         _skill_registry.load_from_directory(str(skills_root), location="skills-root")
 

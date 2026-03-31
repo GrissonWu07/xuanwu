@@ -34,6 +34,15 @@ class TestMainStartup:
         from app.xuanwu.main import app
         assert app.router.lifespan_context is not None
 
+    def test_builtin_skills_root_resolves_to_existing_package_dir(self):
+        """Built-in skills root should resolve to app/xuanwu/skills."""
+        from app.xuanwu.main import _resolve_builtin_skills_root
+
+        skills_root = _resolve_builtin_skills_root()
+        assert skills_root.exists()
+        assert skills_root.is_dir()
+        assert (skills_root / "registry.py").exists()
+
     def test_config_loading(self, test_config_path):
         """验证配置文件加载"""
         from app.xuanwu.core.config import ConfigManager
