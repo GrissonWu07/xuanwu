@@ -12,7 +12,7 @@ from app.xuanwu.api.routes import APIContext, create_router, set_api_context
 from app.xuanwu.auth.config import AuthConfig
 from app.xuanwu.db.database import DatabaseConfig, init_database
 from app.xuanwu.db.orm.user import UserService
-from app.xuanwu.db.schemas import UserCreate
+from app.xuanwu.db.schemas import UserCreate, UserUpdate
 from app.xuanwu.session.manager import SessionManager
 from app.xuanwu.session.queue import SessionQueue
 from app.xuanwu.skills.registry import SkillRegistry
@@ -105,6 +105,46 @@ def test_auth_me_requires_valid_jwt(tmp_path):
         headers={"XuanWu-Authenticate": "bad-token"},
     )
     assert me_fail.status_code == 401
+
+    manager_cleanup(manager)
+
+
+def test_auth_me_includes_avatar_from_profile(tmp_path):
+    manager = init_database_sync(tmp_path)
+    client = _build_client(tmp_path)
+
+    async def _update_profile():
+        async with manager.get_session() as session:
+            user = await UserService.get_by_username(session, "admin")
+            await UserService.update(
+                session,
+                user.id,
+                UserUpdate(
+                    display_name="Atlas Admin",
+                    avatar_url="/user-content/avatars/admin-profile.png",
+                ),
+            )
+
+    import asyncio
+
+    asyncio.run(_update_profile())
+
+    login_resp = client.post(
+        "/api/auth/local/login",
+        json={"username": "admin", "password": "adminpass1"},
+    )
+    assert login_resp.status_code == 200
+    token = login_resp.json()["token"]
+
+    me_resp = client.get(
+        "/api/auth/me",
+        headers={"XuanWu-Authenticate": token},
+    )
+    assert me_resp.status_code == 200
+    body = me_resp.json()
+    assert body["display_name"] == "Atlas Admin"
+    assert body["avatar_url"] == "/user-content/avatars/admin-profile.png"
+    assert body["username"] == "admin"
 
     manager_cleanup(manager)
 

@@ -11,8 +11,10 @@ import { logout } from '../auth.js'
 let headerElement = null
 let titleElement = null
 let dropdownAbortController = null
+let currentHeaderAuthInfo = null
 
 const ICONS = {
+  account: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="5"/></svg>',
   models: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>',
   channels: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   users: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -34,11 +36,14 @@ export function renderHeader(container, { authInfo } = {}) {
 
   cleanupDropdownListeners()
   headerElement = container
+  currentHeaderAuthInfo = { ...(authInfo || {}) }
 
-  const displayName = authInfo?.display_name || authInfo?.username || 'User'
+  const displayName = currentHeaderAuthInfo.display_name || currentHeaderAuthInfo.username || 'User'
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U'
-  const isAdmin = authInfo?.is_admin === true
-  const roleText = isAdmin ? (t('user.roleAdmin') || 'Admin') : (t('user.roleUser') || 'User')
+  const isAdmin = currentHeaderAuthInfo.is_admin === true
+  const roleText = isAdmin
+    ? translateOrFallback('user.roleAdmin', 'Administrator')
+    : translateOrFallback('user.roleUser', 'User')
 
   container.innerHTML = `
     <div class="chat-header-spacer" aria-hidden="true"></div>
@@ -46,7 +51,7 @@ export function renderHeader(container, { authInfo } = {}) {
     <div class="header-actions">
       <div class="user-menu-container">
         <button class="user-avatar-btn" id="userAvatarBtn" title="${escapeHtml(displayName)}">
-          <span class="user-avatar">${escapeHtml(initial)}</span>
+          ${renderUserAvatar(currentHeaderAuthInfo, displayName, initial)}
         </button>
         <div class="user-dropdown hidden" id="userDropdown">
           <div class="dropdown-header">
@@ -54,20 +59,24 @@ export function renderHeader(container, { authInfo } = {}) {
             <span class="dropdown-role">${escapeHtml(roleText)}</span>
           </div>
           <div class="dropdown-divider"></div>
+          <a href="/account" class="dropdown-item" data-nav-link>
+            ${ICONS.account} ${translateOrFallback('nav.account', 'Account Settings')}
+          </a>
           ${isAdmin ? `
+          <div class="dropdown-divider" data-admin-only></div>
           <a href="/admin/users" class="dropdown-item" data-admin-only data-nav-link>
-            ${ICONS.users} ${t('nav.users') || 'User Management'}
+            ${ICONS.users} ${translateOrFallback('nav.users', 'User Management')}
           </a>
           <a href="/models" class="dropdown-item" data-admin-only data-nav-link>
-            ${ICONS.models} ${t('nav.models') || 'Model Management'}
+            ${ICONS.models} ${translateOrFallback('nav.models', 'Model Management')}
           </a>
           <a href="/channels" class="dropdown-item" data-admin-only data-nav-link>
-            ${ICONS.channels} ${t('nav.channels') || 'Channel Management'}
+            ${ICONS.channels} ${translateOrFallback('nav.channels', 'Channel Management')}
           </a>
-          <div class="dropdown-divider" data-admin-only></div>
           ` : ''}
+          <div class="dropdown-divider"></div>
           <a class="dropdown-item dropdown-item-danger" id="btnLogout">
-            ${ICONS.logout} ${t('auth.logout') || 'Logout'}
+            ${ICONS.logout} ${translateOrFallback('auth.logout', 'Sign Out')}
           </a>
         </div>
       </div>
@@ -94,8 +103,8 @@ function setupDropdownListeners() {
   }, { signal })
 
   document.addEventListener('click', (e) => {
-    const container = document.querySelector('.user-menu-container')
-    if (container && !container.contains(e.target)) {
+    const userMenuContainer = document.querySelector('.user-menu-container')
+    if (userMenuContainer && !userMenuContainer.contains(e.target)) {
       dropdown.classList.add('hidden')
     }
   }, { signal })
@@ -106,7 +115,11 @@ function setupDropdownListeners() {
     }
   }, { signal })
 
-  dropdown.querySelectorAll('[data-nav-link]').forEach((link) => {
+  document.addEventListener('atlasclaw:user-profile-updated', (event) => {
+    updateHeaderUser(event.detail || {})
+  }, { signal })
+
+  dropdown.querySelectorAll('[data-nav-link]').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault()
       const href = link.getAttribute('href')
@@ -125,6 +138,31 @@ function setupDropdownListeners() {
       dropdown.classList.add('hidden')
       await logout()
     }, { signal })
+  }
+}
+
+export function updateHeaderUser(authInfo = {}) {
+  if (!headerElement) {
+    currentHeaderAuthInfo = { ...currentHeaderAuthInfo, ...authInfo }
+    return
+  }
+
+  const titleSnapshot = {
+    key: titleElement?.getAttribute('data-i18n') || '',
+    text: titleElement?.textContent || ''
+  }
+
+  renderHeader(headerElement, {
+    authInfo: {
+      ...currentHeaderAuthInfo,
+      ...authInfo
+    }
+  })
+
+  if (titleSnapshot.key) {
+    updateHeaderTitle(titleSnapshot.key)
+  } else if (titleSnapshot.text) {
+    updateHeaderTitleText(titleSnapshot.text)
   }
 }
 
@@ -159,6 +197,7 @@ function getDefaultTitle(key) {
   const defaults = {
     'app.title': 'XuanWu',
     'app.chatTitle': 'Chat',
+    'account.title': 'Account Settings',
     'channel.title': 'Channel Management',
     'model.pageTitle': 'Model Management',
     'admin.title': 'User Management',
@@ -178,10 +217,16 @@ export function cleanupHeader() {
 
 export default {
   renderHeader,
+  updateHeaderUser,
   updateHeaderTitle,
   updateHeaderTitleText,
   getHeaderElement,
   cleanupHeader
+}
+
+function translateOrFallback(key, fallback) {
+  const translated = t(key)
+  return translated === key ? fallback : translated
 }
 
 function escapeHtml(text) {
@@ -191,4 +236,12 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;')
+}
+
+function renderUserAvatar(authInfo, displayName, initial) {
+  if (authInfo?.avatar_url) {
+    return `<img class="user-avatar user-avatar-image" src="${escapeHtml(authInfo.avatar_url)}" alt="${escapeHtml(displayName)}">`
+  }
+
+  return `<span class="user-avatar user-avatar-text">${escapeHtml(initial)}</span>`
 }
