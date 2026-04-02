@@ -13,7 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app.xuanwu.auth.config import AuthConfig
-from app.xuanwu.auth.jwt_token import verify_xuanwu_token
+from app.xuanwu.auth.jwt_token import verify_atlas_token
 from app.xuanwu.auth.models import ANONYMOUS_USER, AuthenticationError, UserInfo
 from app.xuanwu.auth.strategy import AuthStrategy
 
@@ -57,10 +57,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         jwt_cfg = self._auth_config.jwt.expanded()
         oidc_cfg = self._auth_config.oidc.expanded()
-        self._xuanwu_header_name = (jwt_cfg.header_name or "Xuanwu-Authenticate").strip()
-        self._xuanwu_cookie_name = (jwt_cfg.cookie_name or "Xuanwu-Authenticate").strip()
-        self._xuanwu_issuer = jwt_cfg.issuer
-        self._xuanwu_secret = jwt_cfg.secret_key
+        self._atlas_header_name = (jwt_cfg.header_name or "XuanWu-Authenticate").strip()
+        self._atlas_cookie_name = (jwt_cfg.cookie_name or "XuanWu-Authenticate").strip()
+        self._atlas_issuer = jwt_cfg.issuer
+        self._atlas_secret = jwt_cfg.secret_key
         self._ocbc_enabled = bool(oidc_cfg.ocbc_enabled)
 
 
@@ -97,22 +97,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if provider_name != "none":
-            xuanwu_token = self._extract_xuanwu_token(request)
-            if not xuanwu_token:
+            atlas_token = self._extract_atlas_token(request)
+            if not atlas_token:
                 return self._auth_failed_response(request)
 
             try:
-                payload = verify_xuanwu_token(
-                    token=xuanwu_token,
-                    secret_key=self._xuanwu_secret,
-                    issuer=self._xuanwu_issuer,
+                payload = verify_atlas_token(
+                    token=atlas_token,
+                    secret_key=self._atlas_secret,
+                    issuer=self._atlas_issuer,
                 )
 
             except AuthenticationError as exc:
-                logger.debug("Xuanwu token verification failed: %s", exc)
+                logger.debug("Atlas token verification failed: %s", exc)
                 return self._auth_failed_response(request)
 
-            jwt_user_info = self._build_user_info_from_payload(payload, xuanwu_token)
+            jwt_user_info = self._build_user_info_from_payload(payload, atlas_token)
             if provider_name != "local":
                 self._strategy.ensure_user_workspace(jwt_user_info.user_id)
 
@@ -202,12 +202,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
 
 
-    def _extract_xuanwu_token(self, request: Request) -> str:
-        for header_name in (
-            self._xuanwu_header_name,
-            "Xuanwu-Authenticate",
-            "AtlasClaw-Authenticate",
-        ):
+    def _extract_atlas_token(self, request: Request) -> str:
+        for header_name in (self._atlas_header_name, "XuanWu-Authenticate"):
             token = request.headers.get(header_name, "").strip()
             if token:
                 return token
@@ -216,11 +212,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if auth_header.lower().startswith("bearer "):
             return auth_header[7:].strip()
 
-        for cookie_name in (
-            self._xuanwu_cookie_name,
-            "Xuanwu-Authenticate",
-            "AtlasClaw-Authenticate",
-        ):
+        for cookie_name in (self._atlas_cookie_name, "XuanWu-Authenticate"):
             token = request.cookies.get(cookie_name, "").strip()
             if token:
                 return token

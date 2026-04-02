@@ -19,7 +19,7 @@ from app.xuanwu.skills.registry import (
     validate_skill_name,
 )
 from app.xuanwu.agent.prompt_builder import PromptBuilder, PromptBuilderConfig, PromptMode
-from app.xuanwu.core.config_schema import SkillsConfig, XuanwuConfig
+from app.xuanwu.core.config_schema import SkillsConfig, XuanWuConfig
 from app.xuanwu.tools.catalog import ToolCatalog, ToolProfile
 from app.xuanwu.tools.registration import register_builtin_tools
 
@@ -483,8 +483,8 @@ class TestSkillRegistryMdLoading:
         assert "name" not in entry_meta
         assert "description" not in entry_meta
 
-    def test_script_backed_md_tool_disabled_by_default(self, tmp_path):
-        """Script-backed markdown tools should not register unless explicitly enabled."""
+    def test_script_backed_md_tool_registers_by_default(self, tmp_path):
+        """Script-backed markdown tools should register by default."""
         skill_dir = tmp_path / "script-skill"
         _write_skill_md(
             skill_dir / "SKILL.md",
@@ -500,10 +500,10 @@ class TestSkillRegistryMdLoading:
         reg = SkillRegistry()
         reg.load_from_directory(str(tmp_path), location="workspace")
 
-        assert reg.get("script_tool") is None
+        assert reg.get("script_tool") is not None
 
     def test_explicit_python_handler_md_tool_still_registers(self, tmp_path):
-        """Explicit callable handlers remain available without script execution."""
+        """Explicit callable handlers remain available."""
         skill_dir = tmp_path / "callable-skill"
         _write_skill_md(
             skill_dir / "SKILL.md",
@@ -765,7 +765,6 @@ class TestConfigSchema:
         assert cfg.md_skills_desc_max_chars == 200
         assert cfg.md_skills_index_max_chars == 3000
         assert cfg.md_skills_max_file_bytes == 262144
-        assert cfg.allow_script_execution is False
 
     def test_custom_values(self):
         """自定义值验证"""
@@ -777,8 +776,8 @@ class TestConfigSchema:
         assert cfg.md_skills_max_file_bytes == 524288
 
     def test_xuanwu_config_integration(self):
-        """XuanwuConfig 集成验证"""
-        ucfg = XuanwuConfig()
+        """XuanWuConfig 集成验证"""
+        ucfg = XuanWuConfig()
         assert hasattr(ucfg, "skills")
         assert isinstance(ucfg.skills, SkillsConfig)
 
@@ -794,6 +793,10 @@ class TestBuiltinToolHardening:
 
         for tool_name in ("read", "write", "edit", "delete_file", "exec", "process"):
             assert tool_name not in tools
+        assert "present_files" in tools
+        assert "export_docx" in tools
+        assert "export_pptx" in tools
+        assert "export_pdf" in tools
 
     def test_register_builtin_tools_excludes_high_risk_tools(self):
         reg = SkillRegistry()
@@ -802,3 +805,11 @@ class TestBuiltinToolHardening:
         for tool_name in ("read", "write", "edit", "delete_file", "exec", "process"):
             assert tool_name not in registered
             assert reg.get(tool_name) is None
+        assert "present_files" in registered
+        assert reg.get("present_files") is not None
+        assert "export_docx" in registered
+        assert reg.get("export_docx") is not None
+        assert "export_pptx" in registered
+        assert reg.get("export_pptx") is not None
+        assert "export_pdf" in registered
+        assert reg.get("export_pdf") is not None

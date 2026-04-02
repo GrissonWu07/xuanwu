@@ -5,13 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.xuanwu.api.routes import APIContext, create_router, set_api_context
 from app.xuanwu.auth.config import AuthConfig
-from app.xuanwu.auth.jwt_token import issue_xuanwu_token
-from app.xuanwu.auth.middleware import setup_auth_middleware
 from app.xuanwu.db.database import DatabaseConfig, init_database
 from app.xuanwu.db.orm.user import UserService
 from app.xuanwu.db.schemas import UserCreate
@@ -36,35 +34,12 @@ def _build_client(tmp_path: Path) -> TestClient:
             jwt={
                 "secret_key": "test-secret",
                 "issuer": "xuanwu-test",
-                "header_name": "Xuanwu-Authenticate",
-                "cookie_name": "Xuanwu-Authenticate",
+                "header_name": "XuanWu-Authenticate",
+                "cookie_name": "XuanWu-Authenticate",
                 "expires_minutes": 60,
             },
         )
     )
-    return TestClient(app)
-
-
-def _build_protected_client() -> TestClient:
-    auth_config = AuthConfig(
-        provider="local",
-        jwt={
-            "secret_key": "test-secret",
-            "issuer": "xuanwu-test",
-            "header_name": "Xuanwu-Authenticate",
-            "cookie_name": "Xuanwu-Authenticate",
-            "expires_minutes": 60,
-        },
-    )
-
-    app = FastAPI()
-    app.state.config = SimpleNamespace(auth=auth_config)
-    setup_auth_middleware(app, auth_config)
-
-    @app.get("/api/protected")
-    async def protected_route(request: Request):
-        return {"user_id": request.state.user_info.user_id}
-
     return TestClient(app)
 
 
@@ -84,9 +59,9 @@ def test_local_login_success(tmp_path):
     assert body["user"]["username"] == "admin"
     assert body["user"]["auth_type"] == "local"
     assert body["token"]
-    assert body["header_name"] == "Xuanwu-Authenticate"
+    assert body["header_name"] == "XuanWu-Authenticate"
     assert "xuanwu_session" in resp.cookies
-    assert "Xuanwu-Authenticate" in resp.cookies
+    assert "XuanWu-Authenticate" in resp.cookies
 
 
     manager_cleanup(manager)
@@ -120,71 +95,19 @@ def test_auth_me_requires_valid_jwt(tmp_path):
 
     me_ok = client.get(
         "/api/auth/me",
-        headers={"Xuanwu-Authenticate": token},
+        headers={"XuanWu-Authenticate": token},
     )
     assert me_ok.status_code == 200
     assert me_ok.json()["user_id"] == "admin"
 
     me_fail = client.get(
         "/api/auth/me",
-        headers={"Xuanwu-Authenticate": "bad-token"},
+        headers={"XuanWu-Authenticate": "bad-token"},
     )
     assert me_fail.status_code == 401
 
     manager_cleanup(manager)
 
-
-def test_auth_me_accepts_legacy_header_and_session_cookie(tmp_path):
-    manager = init_database_sync(tmp_path)
-    primary_client = _build_client(tmp_path)
-
-    login_resp = primary_client.post(
-        "/api/auth/local/login",
-        json={"username": "admin", "password": "adminpass1"},
-    )
-    assert login_resp.status_code == 200
-    token = login_resp.json()["token"]
-    session_key = login_resp.json()["session"]["key"]
-
-    legacy_client = _build_client(tmp_path)
-    legacy_client.cookies.set("atlasclaw_session", session_key)
-
-    me_resp = legacy_client.get(
-        "/api/auth/me",
-        headers={"AtlasClaw-Authenticate": token},
-    )
-
-    assert me_resp.status_code == 200
-    assert me_resp.json()["user_id"] == "admin"
-
-    manager_cleanup(manager)
-
-
-def test_auth_middleware_accepts_legacy_header_and_cookie():
-    client = _build_protected_client()
-    token = issue_xuanwu_token(
-        subject="admin",
-        is_admin=True,
-        roles=["admin"],
-        auth_type="local",
-        secret_key="test-secret",
-        expires_minutes=60,
-        issuer="xuanwu-test",
-    )
-
-    header_resp = client.get(
-        "/api/protected",
-        headers={"AtlasClaw-Authenticate": token},
-    )
-    assert header_resp.status_code == 200
-    assert header_resp.json()["user_id"] == "admin"
-
-    cookie_client = _build_protected_client()
-    cookie_client.cookies.set("AtlasClaw-Authenticate", token)
-    cookie_resp = cookie_client.get("/api/protected")
-
-    assert cookie_resp.status_code == 200
-    assert cookie_resp.json()["user_id"] == "admin"
 
 
 def init_database_sync(tmp_path: Path):

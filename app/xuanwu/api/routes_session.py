@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from mimetypes import guess_type
 from typing import Any
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
@@ -15,6 +15,11 @@ from ..session.context import SessionKey, SessionScope
 from ..session.queue import QueueMode
 from ..thread_files.models import ThreadArtifactRecord, ThreadUploadRecord
 from ..thread_files.service import ThreadFileService
+from .attachment_links import (
+    AttachmentLinkSigner,
+    resolve_attachment_link_secret,
+    resolve_attachment_link_ttl_seconds,
+)
 from .deps_context import APIContext, get_api_context
 from .schemas import (
     CompactRequest,
@@ -102,6 +107,10 @@ def _ensure_session_owner(auth_user: UserInfo, session_key: str) -> SessionKey:
     return parsed
 
 
+def _is_session_owner(auth_user: UserInfo, session_key: str) -> bool:
+    return SessionKey.from_string(session_key).user_id == auth_user.user_id
+
+
 def _build_session_history_response(transcript: list[Any]) -> SessionHistoryResponse:
     messages = [
         SessionHistoryMessage(
@@ -116,16 +125,15 @@ def _build_session_history_response(transcript: list[Any]) -> SessionHistoryResp
 
 
 def _build_thread_file_service_for_session(
-    auth_user: UserInfo,
     session_key: str,
     ctx: APIContext,
 ) -> ThreadFileService:
     parsed = SessionKey.from_string(session_key)
     thread_id = parsed.thread_id or "main"
-    manager = ctx.session_manager_router.for_user(auth_user.user_id)
+    manager = ctx.session_manager_router.for_user(parsed.user_id)
     return ThreadFileService(
         workspace_path=str(manager.workspace_path),
-        user_id=auth_user.user_id,
+        user_id=parsed.user_id,
         thread_id=thread_id,
     )
 
@@ -133,10 +141,15 @@ def _build_thread_file_service_for_session(
 def _build_attachment_entry(
     session_key: str,
     record: ThreadUploadRecord | ThreadArtifactRecord,
+    signer: AttachmentLinkSigner,
     *,
     kind: str,
 ) -> SessionAttachmentEntry:
-    encoded_session_key = quote(session_key, safe="")
+    entry_id = record.upload_id if kind == "upload" else record.artifact_id
+    signed_download_url, expires_at = signer.build_signed_download_url(
+        session_key=session_key,
+        entry_id=entry_id,
+    )
     if kind == "upload":
         return SessionAttachmentEntry(
             entry_id=record.upload_id,
@@ -148,7 +161,8 @@ def _build_attachment_entry(
             injection_mode=record.injection_mode,
             status=None,
             created_at=record.created_at,
-            download_url=f"/api/sessions/{encoded_session_key}/attachments/{record.upload_id}/content",
+            download_url=signed_download_url,
+            expires_at=expires_at,
         )
     return SessionAttachmentEntry(
         entry_id=record.artifact_id,
@@ -160,8 +174,43 @@ def _build_attachment_entry(
         injection_mode=None,
         status=record.status,
         created_at=record.created_at,
-        download_url=f"/api/sessions/{encoded_session_key}/attachments/{record.artifact_id}/content",
+        download_url=signed_download_url,
+        expires_at=expires_at,
     )
+
+
+def _build_attachment_signer(request_obj: Request) -> AttachmentLinkSigner:
+    return AttachmentLinkSigner(
+        secret_key=resolve_attachment_link_secret(request_obj),
+        default_ttl_seconds=resolve_attachment_link_ttl_seconds(request_obj),
+    )
+
+
+def _ensure_download_authorized(
+    request_obj: Request,
+    auth_user: UserInfo,
+    session_key: str,
+    entry_id: str,
+) -> None:
+    if _is_session_owner(auth_user, session_key):
+        return
+    signer = _build_attachment_signer(request_obj)
+    is_valid, reason = signer.verify_signature(
+        session_key=session_key,
+        entry_id=entry_id,
+        expires_at_raw=request_obj.query_params.get("expires_at"),
+        signature=request_obj.query_params.get("sig"),
+    )
+    if not is_valid:
+        if reason == "missing_signature":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session not found: {session_key}",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Attachment link expired or invalid",
+        )
 
 
 def register_session_routes(router: APIRouter) -> None:
@@ -251,13 +300,14 @@ def register_session_routes(router: APIRouter) -> None:
     ) -> SessionAttachmentsResponse:
         auth_user = _current_user(request_obj)
         _ensure_session_owner(auth_user, session_key)
-        service = _build_thread_file_service_for_session(auth_user, session_key, ctx)
+        service = _build_thread_file_service_for_session(session_key, ctx)
+        signer = _build_attachment_signer(request_obj)
         uploads = [
-            _build_attachment_entry(session_key, item, kind="upload")
+            _build_attachment_entry(session_key, item, signer, kind="upload")
             for item in await service.list_current_thread_attachments()
         ]
         artifacts = [
-            _build_attachment_entry(session_key, item, kind="artifact")
+            _build_attachment_entry(session_key, item, signer, kind="artifact")
             for item in await service.list_current_thread_artifacts()
         ]
         return SessionAttachmentsResponse(uploads=uploads, artifacts=artifacts)
@@ -271,15 +321,16 @@ def register_session_routes(router: APIRouter) -> None:
     ) -> SessionAttachmentUploadResponse:
         auth_user = _current_user(request_obj)
         _ensure_session_owner(auth_user, session_key)
-        service = _build_thread_file_service_for_session(auth_user, session_key, ctx)
+        service = _build_thread_file_service_for_session(session_key, ctx)
         payload = await file.read()
         record = await service.save_upload_bytes(
             file.filename or "upload.bin",
             payload,
             content_type=file.content_type,
         )
+        signer = _build_attachment_signer(request_obj)
         return SessionAttachmentUploadResponse(
-            upload=_build_attachment_entry(session_key, record, kind="upload")
+            upload=_build_attachment_entry(session_key, record, signer, kind="upload")
         )
 
     @router.get("/sessions/{session_key}/attachments/{entry_id}/content")
@@ -290,8 +341,8 @@ def register_session_routes(router: APIRouter) -> None:
         ctx: APIContext = Depends(get_api_context),
     ):
         auth_user = _current_user(request_obj)
-        _ensure_session_owner(auth_user, session_key)
-        service = _build_thread_file_service_for_session(auth_user, session_key, ctx)
+        _ensure_download_authorized(request_obj, auth_user, session_key, entry_id)
+        service = _build_thread_file_service_for_session(session_key, ctx)
         _, record, path = await service.resolve_entry(entry_id)
         if not path.exists():
             raise HTTPException(
@@ -300,6 +351,8 @@ def register_session_routes(router: APIRouter) -> None:
             )
         filename = record.filename if hasattr(record, "filename") else record.name
         media_type = record.content_type if hasattr(record, "content_type") else None
+        if not media_type:
+            media_type = guess_type(filename)[0] or guess_type(str(path))[0]
         return FileResponse(path, media_type=media_type, filename=filename)
 
     @router.post("/sessions/{session_key}/reset")

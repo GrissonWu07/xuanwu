@@ -84,9 +84,9 @@ def test_agent_info_uses_soul_system_prompt_first_paragraph_as_description(tmp_p
     agent_dir = tmp_path / ".xuanwu" / "agents" / "main"
     agent_dir.mkdir(parents=True)
     (agent_dir / "SOUL.md").write_text(
-        '---\nagent_id: "main"\nname: "Xuanwu Enterprise AI Assistant"\nversion: "1.0"\n---\n\n'
+        '---\nagent_id: "main"\nname: "XuanWu Enterprise AI Assistant"\nversion: "1.0"\n---\n\n'
         "## System Prompt\n\n"
-        "Xuanwu is an enterprise-grade AI assistant positioned as an intelligent collaboration partner for employees.\n\n"
+        "XuanWu is an enterprise-grade AI assistant positioned as an intelligent collaboration partner for employees.\n\n"
         "- Business Understanding: Comprehension of enterprise business processes and terminology\n",
         encoding="utf-8",
     )
@@ -100,11 +100,11 @@ def test_agent_info_uses_soul_system_prompt_first_paragraph_as_description(tmp_p
     assert response.status_code == 200
     payload = response.json()
     assert payload["description"] == (
-        "Xuanwu is an enterprise-grade AI assistant positioned as an intelligent "
+        "XuanWu is an enterprise-grade AI assistant positioned as an intelligent "
         "collaboration partner for employees."
     )
     assert payload["welcome_message"] == (
-        "Hello! I'm Xuanwu Enterprise AI Assistant.\n\n"
-        "Xuanwu is an enterprise-grade AI assistant positioned as an intelligent "
+        "Hello! I'm XuanWu Enterprise AI Assistant.\n\n"
+        "XuanWu is an enterprise-grade AI assistant positioned as an intelligent "
         "collaboration partner for employees."
     )

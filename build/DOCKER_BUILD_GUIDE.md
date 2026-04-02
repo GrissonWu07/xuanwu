@@ -1,10 +1,10 @@
-# Xuanwu Build
+# XuanWu Build
 
-This directory contains build scripts and configurations for both OpenSource and Enterprise editions of Xuanwu.
+This directory contains build scripts and configurations for both OpenSource and Enterprise editions of XuanWu.
 
 ## Container Directory Structure
 
-Xuanwu container uses the following internal directory structure:
+XuanWu container uses the following internal directory structure:
 
 ```
 /app/
@@ -49,8 +49,8 @@ Xuanwu container uses the following internal directory structure:
 
 | File | Description |
 |------|-------------|
-| `docker-compose.yml` | Single Xuanwu container |
-| `docker-compose.enterprise.yml` | Xuanwu + MySQL 8.5 + Secrets |
+| `docker-compose.yml` | Single XuanWu container |
+| `docker-compose.enterprise.yml` | XuanWu + MySQL 8.5 + Secrets |
 
 ### Scripts
 
@@ -259,7 +259,7 @@ Edit `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "8080:8000"
+  - "8080:9000"
 ```
 
 ### Permission Denied

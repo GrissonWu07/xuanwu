@@ -2,7 +2,7 @@
 
 **Context**
 
-Xuanwu currently loads provider skills from `providers_root`, but they are not consistently registered as `provider:skill`. This leaves room for name collisions and forces webhook dispatch to depend on a separate `webhook.skill_sources` loading path.
+XuanWu currently loads provider skills from `providers_root`, but they are not consistently registered as `provider:skill`. This leaves room for name collisions and forces webhook dispatch to depend on a separate `webhook.skill_sources` loading path.
 
 **Decision**
 

@@ -10,7 +10,7 @@ import pytest
 from pathlib import Path
 
 from app.xuanwu.core.config import ConfigManager
-from app.xuanwu.core.config_schema import XuanwuConfig
+from app.xuanwu.core.config_schema import XuanWuConfig
 
 
 class TestConfigWorkspaceLoading:
@@ -42,7 +42,7 @@ class TestConfigWorkspaceLoading:
         
         用户配置存储在 user_setting.json 中，包含 channels, preferences。
         注意：providers 是系统级配置，不在用户配置中。
-        支持向后兼容旧格式 atlasclaw.json。
+        支持向后兼容旧格式 xuanwu.json。
         """
         # Create workspace config with workspace path
         workspace_config = {
@@ -76,7 +76,7 @@ class TestConfigWorkspaceLoading:
         assert user_config_loaded.get("preferences", {}).get("language") == "zh-CN"
     
     def test_load_user_config_legacy_format(self, tmp_path):
-        """场景：向后兼容旧格式 atlasclaw.json"""
+        """场景：向后兼容旧格式 xuanwu.json"""
         # Create workspace config
         workspace_config = {
             "model": {"primary": "workspace-model"},
@@ -86,7 +86,7 @@ class TestConfigWorkspaceLoading:
         with open(workspace_config_path, "w") as f:
             json.dump(workspace_config, f)
 
-        # Create user config (legacy format - atlasclaw.json)
+        # Create user config (legacy format - xuanwu.json)
         # Note: providers field in legacy format will be ignored as providers are system-level
         legacy_user_config = {
             "channels": {"slack": {"connections": []}},
@@ -94,7 +94,7 @@ class TestConfigWorkspaceLoading:
         }
         users_dir = tmp_path / "users" / "legacy_user"
         users_dir.mkdir(parents=True)
-        user_config_path = users_dir / "atlasclaw.json"  # Legacy format
+        user_config_path = users_dir / "xuanwu.json"  # Legacy format
         with open(user_config_path, "w") as f:
             json.dump(legacy_user_config, f)
 
@@ -106,53 +106,6 @@ class TestConfigWorkspaceLoading:
         user_config_loaded = config_manager.load_user_config("legacy_user")
         assert "channels" in user_config_loaded
         assert "preferences" in user_config_loaded
-
-    def test_load_legacy_root_config_filename(self, tmp_path, monkeypatch):
-        """场景：向后兼容项目根 atlasclaw.json"""
-        legacy_config_path = tmp_path / "atlasclaw.json"
-        with open(legacy_config_path, "w") as f:
-            json.dump({"model": {"primary": "legacy-root-model"}}, f)
-
-        monkeypatch.delenv("XUANWU_CONFIG", raising=False)
-        monkeypatch.delenv("ATLASCLAW_CONFIG", raising=False)
-        monkeypatch.chdir(tmp_path)
-
-        config_manager = ConfigManager()
-        config = config_manager.load()
-
-        assert config.model.primary == "legacy-root-model"
-        assert config_manager.resolved_config_path == legacy_config_path.resolve()
-
-    def test_load_legacy_config_env_path(self, tmp_path, monkeypatch):
-        """场景：向后兼容 ATLASCLAW_CONFIG"""
-        legacy_config_path = tmp_path / "legacy-env-config.json"
-        with open(legacy_config_path, "w") as f:
-            json.dump({"model": {"primary": "legacy-env-model"}}, f)
-
-        monkeypatch.delenv("XUANWU_CONFIG", raising=False)
-        monkeypatch.setenv("ATLASCLAW_CONFIG", str(legacy_config_path))
-
-        config_manager = ConfigManager()
-        config = config_manager.load()
-
-        assert config.model.primary == "legacy-env-model"
-        assert config_manager.resolved_config_path == legacy_config_path.resolve()
-
-    def test_load_legacy_env_prefix(self, tmp_path, monkeypatch):
-        """场景：向后兼容 ATLASCLAW_* 环境变量前缀"""
-        config_path = tmp_path / "minimal.json"
-        with open(config_path, "w") as f:
-            json.dump({}, f)
-
-        monkeypatch.delenv("XUANWU_CONFIG", raising=False)
-        monkeypatch.delenv("ATLASCLAW_CONFIG", raising=False)
-        monkeypatch.delenv("XUANWU_AGENT_DEFAULTS__TIMEOUT_SECONDS", raising=False)
-        monkeypatch.setenv("ATLASCLAW_AGENT_DEFAULTS__TIMEOUT_SECONDS", "123")
-
-        config_manager = ConfigManager(config_path=str(config_path))
-        config = config_manager.load()
-
-        assert config.agent_defaults.timeout_seconds == 123
 
     def test_config_merge_priority(self, tmp_path):
         """场景：验证配置优先级（工作区 > 全局 > 默认）"""

@@ -1,4 +1,4 @@
-"""Markdown-backed memory persistence for Xuanwu.
+"""Markdown-backed memory persistence for XuanWu.
 
 The memory manager stores daily memories and long-term memories in Markdown
 files under the workspace. It also provides read, search, and parsing helpers

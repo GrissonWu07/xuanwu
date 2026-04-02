@@ -101,7 +101,6 @@ This plan is incremental on top of the existing generic Hook Runtime. The generi
 
 Run after implementation:
 
-1. `pytest tests/xuanwu -m "not e2e" -q -p no:cacheprovider`
+1. `pytest tests/atlasclaw -m "not e2e" -q -p no:cacheprovider`
 2. `npm --prefix app/frontend test -- --runInBand`
-3. `pytest tests/xuanwu -m e2e -q -p no:cacheprovider`
-
+3. `pytest tests/atlasclaw -m e2e -q -p no:cacheprovider`

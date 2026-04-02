@@ -1,4 +1,4 @@
-"""Agent execution layer for Xuanwu.
+"""Agent execution layer for XuanWu.
 
 The `agent` package groups together the components responsible for prompt
 construction, iterative agent execution, response compaction, and stream

@@ -1,6 +1,12 @@
+<<<<<<<< HEAD:docs/Xuanwu Plugins.MD
 # Xuanwu Plugins Extension Guide
 
 This document explains how to extend Xuanwu functionality across three areas: Authentication, Channels, and Skills.
+========
+# XuanWu Plugins Extension Guide
+
+This document explains how to extend XuanWu functionality across three areas: Authentication, Channels, and Skills.
+>>>>>>>> codex/sync-upstream-13:docs/XuanWu Plugins.MD
 
 ## Design Principles
 
@@ -14,7 +20,11 @@ This document explains how to extend Xuanwu functionality across three areas: Au
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
+<<<<<<<< HEAD:docs/Xuanwu Plugins.MD
 │                         Xuanwu Extension Architecture                     │
+========
+│                         XuanWu Extension Architecture                     │
+>>>>>>>> codex/sync-upstream-13:docs/XuanWu Plugins.MD
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐  │
@@ -207,16 +217,27 @@ skills/                           # Configured via skills_root (default: ../skil
 
 ## Message Processing Flow
 
+<<<<<<<< HEAD:docs/Xuanwu Plugins.MD
 ### Inbound Messages (Platform → Xuanwu)
 
 1. User sends message on platform
 2. Platform pushes to Xuanwu Webhook
+========
+### Inbound Messages (Platform → XuanWu)
+
+1. User sends message on platform
+2. Platform pushes to XuanWu Webhook
+>>>>>>>> codex/sync-upstream-13:docs/XuanWu Plugins.MD
 3. `ChannelHandler.handle_inbound()` processes message
 4. Verify signature, parse message, convert format
 5. Route to corresponding Session
 6. Agent executes and generates reply
 
+<<<<<<<< HEAD:docs/Xuanwu Plugins.MD
 ### Outbound Messages (Xuanwu → Platform)
+========
+### Outbound Messages (XuanWu → Platform)
+>>>>>>>> codex/sync-upstream-13:docs/XuanWu Plugins.MD
 
 1. Agent generates `OutboundMessage`
 2. `ChannelHandler.send_message()` sends message
@@ -242,4 +263,8 @@ skills/                           # Configured via skills_root (default: ../skil
 
 ---
 
+<<<<<<<< HEAD:docs/Xuanwu Plugins.MD
 *This design is based on current Xuanwu implementation, adopting unified Provider directory scanning mechanism and single ChannelRegistry architecture.*
+========
+*This design is based on current XuanWu implementation, adopting unified Provider directory scanning mechanism and single ChannelRegistry architecture.*
+>>>>>>>> codex/sync-upstream-13:docs/XuanWu Plugins.MD

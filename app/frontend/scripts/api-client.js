@@ -1,5 +1,5 @@
 /**
- * Xuanwu API Client
+ * XuanWu API Client
  * Encapsulate communication with backend API
  */
 
@@ -161,6 +161,27 @@ export async function uploadSessionAttachment(sessionKey, file) {
 }
 
 /**
+ * Delete a session
+ * @param {string} sessionKey - Session key
+ * @returns {Promise<object>} Result payload
+ */
+export async function deleteSession(sessionKey) {
+    const response = await fetch(
+        buildApiUrl(`/api/sessions/${encodeURIComponent(sessionKey)}`),
+        {
+            method: 'DELETE',
+            credentials: 'include'
+        }
+    )
+
+    if (!response.ok) {
+        throw new Error(`Failed to delete session: ${response.status}`)
+    }
+
+    return response.json()
+}
+
+/**
  * Reset session
  * @param {string} sessionKey - Session key
  * @param {boolean} archive - Whether to archive
@@ -265,6 +286,7 @@ export default {
     createThreadSession,
     getSession,
     getSessionHistory,
+    deleteSession,
     listSessionAttachments,
     uploadSessionAttachment,
     resetSession,

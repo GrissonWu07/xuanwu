@@ -113,4 +113,3 @@ class ContextSink:
         if limit is not None and limit >= 0:
             combined = combined[-limit:]
         return combined
-

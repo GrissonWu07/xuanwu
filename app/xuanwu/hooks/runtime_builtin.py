@@ -69,4 +69,3 @@ def _build_pending_summary(event) -> str:
         error = str(event.payload.get("error") or "Tool execution failed")
         return f"{tool_name}: {error}"
     return f"Review hook event: {event.event_type.value}"
-

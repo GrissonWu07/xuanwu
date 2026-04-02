@@ -63,6 +63,7 @@ class SessionAttachmentEntry(BaseModel):
     status: Optional[str] = None
     created_at: str
     download_url: str
+    expires_at: Optional[int] = None
 
 
 class SessionAttachmentsResponse(BaseModel):

@@ -16,15 +16,15 @@ from app.xuanwu.hooks.runtime_models import HookEventType
 
 def _create_hooks_e2e_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     db_path = tmp_path / "hook-runtime-e2e.db"
-    config_path = tmp_path / "atlasclaw.hook-runtime.e2e.json"
+    config_path = tmp_path / "xuanwu.hook-runtime.e2e.json"
 
     config = {
         "workspace": {
-            "path": str((tmp_path / ".atlasclaw-e2e").resolve()),
+            "path": str((tmp_path / ".xuanwu-e2e").resolve()),
         },
-        "providers_root": "./app/atlasclaw/providers",
-        "skills_root": "./app/atlasclaw/skills",
-        "channels_root": "./app/atlasclaw/channels",
+        "providers_root": "./app/xuanwu/providers",
+        "skills_root": "./app/xuanwu/skills",
+        "channels_root": "./app/xuanwu/channels",
         "database": {
             "type": "sqlite",
             "sqlite": {
@@ -36,9 +36,9 @@ def _create_hooks_e2e_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             "provider": "local",
             "jwt": {
                 "secret_key": "e2e-secret",
-                "issuer": "atlasclaw-e2e",
-                "header_name": "AtlasClaw-Authenticate",
-                "cookie_name": "AtlasClaw-Authenticate",
+                "issuer": "xuanwu-e2e",
+                "header_name": "XuanWu-Authenticate",
+                "cookie_name": "XuanWu-Authenticate",
                 "expires_minutes": 60,
             },
             "local": {
@@ -68,7 +68,7 @@ def _create_hooks_e2e_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     }
 
     config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
-    monkeypatch.setenv("ATLASCLAW_CONFIG", str(config_path.resolve()))
+    monkeypatch.setenv("XUANWU_CONFIG", str(config_path.resolve()))
 
     import app.xuanwu.core.config as config_module
     from app.xuanwu.main import create_app
@@ -122,7 +122,7 @@ def test_hook_runtime_routes_support_events_and_decisions(
 
             asyncio.run(_seed())
 
-            headers = {"AtlasClaw-Authenticate": token}
+            headers = {"XuanWu-Authenticate": token}
             events_resp = client.get(f"/api/hooks/{RUNTIME_AUDIT_MODULE}/events", headers=headers)
             pending_resp = client.get(f"/api/hooks/{RUNTIME_AUDIT_MODULE}/pending", headers=headers)
 
@@ -152,9 +152,8 @@ def test_hook_runtime_routes_support_events_and_decisions(
             assert pending_after.status_code == 200
             assert pending_after.json() == []
 
-            memory_dir = tmp_path / ".atlasclaw-e2e" / "users" / "admin" / "memory"
+            memory_dir = tmp_path / ".xuanwu-e2e" / "users" / "admin" / "memory"
             memory_files = list(memory_dir.glob("memory_*.md"))
             assert len(memory_files) == 1
     finally:
         config_module._config_manager = old_config_manager
-

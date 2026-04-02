@@ -518,17 +518,24 @@ tool
         name: str,
         relative_path: str,
         download_url: str,
+        expires_at: int | None = None,
     ) -> int:
         """Push a generated artifact event."""
-        return self.push_event(run_id, SSEEvent(
-            event_type=SSEEventType.ARTIFACT,
-            data={
-                "artifact_id": artifact_id,
-                "name": name,
-                "relative_path": relative_path,
-                "download_url": download_url,
-            },
-        ))
+        payload = {
+            "artifact_id": artifact_id,
+            "name": name,
+            "relative_path": relative_path,
+            "download_url": download_url,
+        }
+        if expires_at is not None:
+            payload["expires_at"] = expires_at
+        return self.push_event(
+            run_id,
+            SSEEvent(
+                event_type=SSEEventType.ARTIFACT,
+                data=payload,
+            ),
+        )
         
     def get_active_streams(self) -> list[str]:
         """get ID"""

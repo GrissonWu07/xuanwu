@@ -317,7 +317,7 @@ Run:
 - [ ] **Step 4: Verify service startup**
 
 Run:
-- `python -m uvicorn app.xuanwu.main:app --host 127.0.0.1 --port 8000`
+- `python -m uvicorn app.xuanwu.main:app --host 127.0.0.1 --port 9000`
 
 Expected:
 - service starts successfully

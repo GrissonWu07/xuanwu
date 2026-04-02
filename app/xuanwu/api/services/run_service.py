@@ -6,7 +6,6 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
-from urllib.parse import quote
 
 from fastapi import HTTPException, status
 
@@ -14,6 +13,11 @@ from ...auth.models import ANONYMOUS_USER, UserInfo
 from ...core.security_guard import encode_if_untrusted
 from ...session.context import SessionKey
 from ...thread_files.service import ThreadFileService
+from ..attachment_links import (
+    AttachmentLinkSigner,
+    resolve_attachment_link_secret,
+    resolve_attachment_link_ttl_seconds,
+)
 from ..deps_context import APIContext, build_scoped_deps
 
 logger = logging.getLogger(__name__)
@@ -83,11 +87,14 @@ async def execute_agent_run(
     request_cookies: Optional[dict[str, str]] = None,
     provider_config: Optional[dict[str, Any]] = None,
     request_context: Optional[dict[str, Any]] = None,
+    attachment_link_secret: Optional[str] = None,
+    attachment_link_ttl_seconds: Optional[int] = None,
 ) -> None:
     _user_info = user_info or ANONYMOUS_USER
     thread_files = _build_thread_file_service(ctx, session_key, _user_info)
     runtime_batch = await thread_files.create_runtime_batch()
     runtime_snapshot = await thread_files.snapshot_runtime_files(runtime_batch.batch_id)
+    deps = None
 
     try:
         target_agent_id = SessionKey.from_string(session_key).agent_id or "main"
@@ -172,18 +179,40 @@ async def execute_agent_run(
 
     finally:
         try:
+            presented_paths = None
+            if deps is not None and isinstance(getattr(deps, "extra", None), dict):
+                raw_presented = deps.extra.get("presented_artifacts")
+                if isinstance(raw_presented, list):
+                    presented_paths = [
+                        str(item)
+                        for item in raw_presented
+                        if isinstance(item, str) and str(item).strip()
+                    ]
             artifacts = await thread_files.finalize_runtime_artifacts(
                 runtime_batch.batch_id,
                 runtime_snapshot,
+                presented_relative_paths=presented_paths,
             )
-            encoded_session_key = quote(session_key, safe="")
+            signer = AttachmentLinkSigner(
+                secret_key=attachment_link_secret or resolve_attachment_link_secret(),
+                default_ttl_seconds=(
+                    attachment_link_ttl_seconds
+                    if attachment_link_ttl_seconds is not None
+                    else resolve_attachment_link_ttl_seconds()
+                ),
+            )
             for artifact in artifacts:
+                download_url, expires_at = signer.build_signed_download_url(
+                    session_key=session_key,
+                    entry_id=artifact.artifact_id,
+                )
                 ctx.sse_manager.push_artifact(
                     run_id,
                     artifact_id=artifact.artifact_id,
                     name=artifact.name,
                     relative_path=artifact.relative_path,
-                    download_url=f"/api/sessions/{encoded_session_key}/attachments/{artifact.artifact_id}/content",
+                    download_url=download_url,
+                    expires_at=expires_at,
                 )
         except Exception as exc:
             logger.warning("Failed to finalize runtime artifacts for %s: %s", run_id, exc)

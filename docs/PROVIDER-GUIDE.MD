@@ -1,4 +1,4 @@
-# Xuanwu Provider Development Guide
+# XuanWu Provider Development Guide
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@
 
 ### What is a Provider?
 
-A **Provider** in Xuanwu is a modular integration package that connects the AI Agent to external enterprise systems. Providers encapsulate:
+A **Provider** in XuanWu is a modular integration package that connects the AI Agent to external enterprise systems. Providers encapsulate:
 
 - **Authentication logic** - How to connect to the external system
 - **Skills** - Actions the Agent can perform on the system
@@ -645,7 +645,7 @@ Providers can be deployed to multiple locations:
 **Location**: `app/xuanwu/providers/<provider-name>/`
 
 **Characteristics**:
-- Shipped with Xuanwu Core
+- Shipped with XuanWu Core
 - Core integrations (Jira, etc.)
 - Updated with Core releases
 - Always available
@@ -690,7 +690,7 @@ Providers can be deployed to multiple locations:
 
 #### Discovery Process
 
-Xuanwu discovers Providers through this process:
+XuanWu discovers Providers through this process:
 
 1. **Search Path Resolution**
    - Scan built-in Providers directory
@@ -805,7 +805,7 @@ Copy Provider directory to target location:
 
 #### Step 6: Verify Loading
 
-1. Restart Xuanwu (or trigger reload)
+1. Restart XuanWu (or trigger reload)
 2. Check logs for Provider loading
 3. Query `/api/skills` endpoint
 4. Test Provider functionality
@@ -816,24 +816,24 @@ Copy Provider directory to target location:
 
 Review application logs:
 ```
-[Xuanwu] Provider loaded: my-provider
-[Xuanwu] Skills loaded: 3 from my-provider
+[XuanWu] Provider loaded: my-provider
+[XuanWu] Skills loaded: 3 from my-provider
 ```
 
 #### List Available Skills
 
 ```bash
-curl http://localhost:8000/api/skills | grep my-provider
+curl http://localhost:9000/api/skills | grep my-provider
 ```
 
 #### Test Provider
 
 ```bash
 # List configured instances
-curl http://localhost:8000/api/providers/my-provider/instances
+curl http://localhost:9000/api/providers/my-provider/instances
 
 # Execute a Skill
-curl -X POST http://localhost:8000/api/skills/execute \
+curl -X POST http://localhost:9000/api/skills/execute \
   -H "Content-Type: application/json" \
   -d '{
     "skill": "my-provider/my-skill",
@@ -932,7 +932,7 @@ In development mode:
 ## Provider Distribution
 
 ### Built-in Providers
-- Included in Xuanwu Core
+- Included in XuanWu Core
 - Auto-discovered at startup
 - Updated with Core releases
 
@@ -971,5 +971,5 @@ In development mode:
 
 - [OpenSpec Provider Guide](../openspec/PROVIDERS.md)
 - [Jira REST API Documentation](https://developer.atlassian.com/cloud/jira/platform/rest/v2/)
-- [Xuanwu Core Documentation](./PROJECT_OVERVIEW.MD)
+- [XuanWu Core Documentation](./PROJECT_OVERVIEW.MD)
 - [Skill Development Guide](./SKILL-GUIDE.MD)

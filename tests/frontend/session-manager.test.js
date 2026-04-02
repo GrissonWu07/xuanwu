@@ -7,8 +7,8 @@ global.fetch = jest.fn();
 
 // Mock config module
 jest.mock('../../app/frontend/scripts/config.js', () => ({
-    buildApiUrl: (path) => `http://127.0.0.1:8000${path}`,
-    getConfig: () => ({ apiBaseUrl: 'http://127.0.0.1:8000' })
+    buildApiUrl: (path) => `http://127.0.0.1:9000${path}`,
+    getConfig: () => ({ apiBaseUrl: 'http://127.0.0.1:9000' })
 }));
 
 // Mock sessionStorage

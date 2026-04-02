@@ -3,15 +3,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.xuanwu.channels import ChannelConnection, ChannelRegistry
 from app.xuanwu.channels.handlers import WebSocketHandler
-from app.xuanwu.channels.models import InboundMessage
+from app.xuanwu.channels.models import ConnectionStatus, InboundMessage, SendResult
 from app.xuanwu.channels.manager import ChannelManager
 
 
@@ -137,6 +139,80 @@ class TestChannelManager:
         
         assert inbound is None
 
+    @pytest.mark.asyncio
+    async def test_route_inbound_message_triggers_agent_and_reply(self):
+        """Route should parse inbound, run agent, and send channel reply."""
+        handler = MagicMock()
+        handler.config = {}
+        handler.handle_inbound = AsyncMock(
+            return_value=InboundMessage(
+                message_id="msg-1",
+                sender_id="ext-user-1",
+                sender_name="External User",
+                chat_id="chat-1",
+                channel_type="feishu",
+                content="hello",
+                metadata={"chat_type": "p2p"},
+            )
+        )
+        handler.send_message = AsyncMock(return_value=SendResult(success=True))
+        self.manager._active_connections["owner-1:feishu:conn-1"] = handler
+
+        async def _event_stream():
+            yield SimpleNamespace(type="assistant", content="world", error=None)
+
+        self.manager._agent_runner = MagicMock()
+        self.manager._agent_runner.run = MagicMock(return_value=_event_stream())
+        self.manager._event_loop = asyncio.get_running_loop()
+
+        inbound = await self.manager.route_inbound_message(
+            "feishu",
+            "conn-1",
+            {"header": {"event_type": "im.message.receive_v1"}},
+        )
+        await asyncio.sleep(0)
+
+        assert inbound is not None
+        self.manager._agent_runner.run.assert_called_once()
+        handler.send_message.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_route_inbound_message_skips_group_without_mention_when_required(self):
+        """Feishu group message should be skipped if mention is required but absent."""
+        handler = MagicMock()
+        handler.config = {"require_at_mention_in_group": True}
+        handler.handle_inbound = AsyncMock(
+            return_value=InboundMessage(
+                message_id="msg-group-1",
+                sender_id="ext-user-1",
+                sender_name="External User",
+                chat_id="group-1",
+                channel_type="feishu",
+                content="hello group",
+                metadata={"chat_type": "group", "has_mention": False},
+            )
+        )
+        handler.send_message = AsyncMock(return_value=SendResult(success=True))
+        self.manager._active_connections["owner-1:feishu:conn-1"] = handler
+
+        async def _event_stream():
+            yield SimpleNamespace(type="assistant", content="world", error=None)
+
+        self.manager._agent_runner = MagicMock()
+        self.manager._agent_runner.run = MagicMock(return_value=_event_stream())
+        self.manager._event_loop = asyncio.get_running_loop()
+
+        inbound = await self.manager.route_inbound_message(
+            "feishu",
+            "conn-1",
+            {"header": {"event_type": "im.message.receive_v1"}},
+        )
+        await asyncio.sleep(0)
+
+        assert inbound is not None
+        self.manager._agent_runner.run.assert_not_called()
+        handler.send_message.assert_not_awaited()
+
     def test_get_user_connections(self):
         """Test getting user connections (sync version)."""
         # Manually add handlers to active connections
@@ -158,6 +234,42 @@ class TestChannelManager:
         
         assert len(connections) == 1
         assert connections[0]["channel_type"] == "websocket"
+
+    @pytest.mark.asyncio
+    async def test_probe_connection_reports_health_and_status(self):
+        handler = WebSocketHandler({})
+        handler._status = ConnectionStatus.CONNECTED
+        handler.health_check = AsyncMock(return_value=True)
+        instance_key = "user-123:websocket:conn-123"
+        self.manager._active_connections[instance_key] = handler
+
+        result = await self.manager.probe_connection("user-123", "websocket", "conn-123")
+
+        assert result["healthy"] is True
+        assert result["status"] == "connected"
+
+    @pytest.mark.asyncio
+    async def test_reconnect_connection_delegates_to_handler(self):
+        handler = WebSocketHandler({})
+        handler._status = ConnectionStatus.ERROR
+        handler.reconnect = AsyncMock(return_value=True)
+        instance_key = "user-123:websocket:conn-123"
+        self.manager._active_connections[instance_key] = handler
+
+        result = await self.manager.reconnect_connection("user-123", "websocket", "conn-123")
+
+        assert result is True
+        handler.reconnect.assert_awaited_once()
+
+    def test_list_active_connection_descriptors(self):
+        handler = WebSocketHandler({})
+        self.manager._active_connections["user-123:websocket:conn-1"] = handler
+        self.manager._active_connections["user-123:websocket:conn-2"] = handler
+
+        items = self.manager.list_active_connection_descriptors()
+
+        assert len(items) == 2
+        assert items[0]["user_id"] == "user-123"
 
     @pytest.mark.asyncio
     async def test_enable_connection(self):

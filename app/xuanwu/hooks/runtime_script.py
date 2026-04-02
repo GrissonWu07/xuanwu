@@ -137,4 +137,3 @@ class HookScriptRunner:
             payload = {key: value for key, value in item.items() if key != "type"}
             actions.append(HookScriptAction(action_type=action_type, payload=payload))
         return HookScriptActionBatch(actions=actions)
-

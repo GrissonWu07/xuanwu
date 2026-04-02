@@ -1,6 +1,5 @@
 const AUTH_STORAGE_KEY = 'xuanwu_auth_token'
-const LEGACY_AUTH_STORAGE_KEY = 'atlasclaw_auth_token'
-const AUTH_HEADER_NAME = 'Xuanwu-Authenticate'
+const AUTH_HEADER_NAME = 'XuanWu-Authenticate'
 
 export function redirectToLogin() {
   const current = `${window.location.pathname}${window.location.search}`
@@ -10,18 +9,7 @@ export function redirectToLogin() {
 
 export function getAuthToken() {
   try {
-    const token = sessionStorage.getItem(AUTH_STORAGE_KEY)
-    if (token) {
-      return token
-    }
-
-    const legacyToken = sessionStorage.getItem(LEGACY_AUTH_STORAGE_KEY) || ''
-    if (legacyToken) {
-      sessionStorage.setItem(AUTH_STORAGE_KEY, legacyToken)
-      sessionStorage.removeItem(LEGACY_AUTH_STORAGE_KEY)
-    }
-
-    return legacyToken
+    return sessionStorage.getItem(AUTH_STORAGE_KEY) || ''
   } catch (_error) {
     return ''
   }
@@ -40,7 +28,6 @@ export function setAuthToken(token) {
 export function clearAuthToken() {
   try {
     sessionStorage.removeItem(AUTH_STORAGE_KEY)
-    sessionStorage.removeItem(LEGACY_AUTH_STORAGE_KEY)
   } catch (_error) {
     // ignore
   }

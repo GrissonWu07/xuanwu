@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Authentication providers for Xuanwu."""
+"""Authentication providers for XuanWu."""
 
 from __future__ import annotations
 

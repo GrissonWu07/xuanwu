@@ -293,6 +293,43 @@ def build_attachment_context(attachment_context: dict[str, list[dict]]) -> str:
     return "\n".join(lines)
 
 
+def build_attachment_runtime(attachment_runtime: dict[str, str]) -> str:
+    """Build runtime hints for generated-file export in the current thread run."""
+    if not isinstance(attachment_runtime, dict):
+        return ""
+
+    batch_id = str(attachment_runtime.get("attachment_batch_id") or "").strip()
+    uploads_dir = str(attachment_runtime.get("attachment_uploads_dir") or "").strip()
+    workspace_dir = str(attachment_runtime.get("attachment_workspace_dir") or "").strip()
+    outputs_dir = str(attachment_runtime.get("attachment_outputs_dir") or "").strip()
+    attachment_root = str(attachment_runtime.get("attachment_root") or "").strip()
+
+    if not any([batch_id, uploads_dir, workspace_dir, outputs_dir, attachment_root]):
+        return ""
+
+    lines = ["## Attachment Runtime", ""]
+    if batch_id:
+        lines.append(f"Current batch: `{batch_id}`")
+    if attachment_root:
+        lines.append(f"Batch root: `{attachment_root}`")
+    if uploads_dir:
+        lines.append(f"Uploads dir: `{uploads_dir}`")
+    if workspace_dir:
+        lines.append(f"Workspace dir: `{workspace_dir}`")
+    if outputs_dir:
+        lines.append(f"Outputs dir: `{outputs_dir}`")
+
+    lines.append("")
+    lines.append("File-output workflow for this run:")
+    lines.append("- Read user uploads from uploads/workspace as needed.")
+    lines.append("- Put final deliverables under the current outputs/workspace directory.")
+    lines.append("- Call `present_files` with generated file path(s) to expose downloadable artifacts.")
+    lines.append(
+        "- If a sub-agent writes files under `/mnt/acp-workspace`, copy them into outputs/workspace first, then call `present_files`."
+    )
+    return "\n".join(lines)
+
+
 def build_workspace_info(config) -> str:
     """Build workspace section."""
     workspace = Path(config.workspace_path).expanduser()
@@ -309,7 +346,7 @@ def build_documentation() -> str:
 
 Local documentation path: `docs/`
 
-To understand Xuanwu's behavior, commands, configuration, or architecture, please refer to the local documentation first."""
+To understand XuanWu's behavior, commands, configuration, or architecture, please refer to the local documentation first."""
 
 
 def build_sandbox(config) -> str:
@@ -342,9 +379,30 @@ def build_reply_tags() -> str:
     return ""
 
 
-def build_heartbeats() -> str:
-    """Build heartbeat section (currently optional/no-op)."""
-    return ""
+def build_heartbeats(
+    *,
+    heartbeat_markdown: str = "",
+    every_seconds: Optional[int] = None,
+    active_hours: str = "",
+    isolated_session: bool = False,
+) -> str:
+    """Build heartbeat guidance section when heartbeat context is available."""
+    if not heartbeat_markdown.strip():
+        return ""
+
+    lines = ["## Heartbeat", ""]
+    if every_seconds is not None:
+        lines.append(f"Schedule: every {every_seconds} seconds")
+    if active_hours:
+        lines.append(f"Active hours: {active_hours}")
+    lines.append(
+        "Execution mode: isolated session"
+        if isolated_session
+        else "Execution mode: shared session"
+    )
+    lines.append("")
+    lines.append(heartbeat_markdown.strip())
+    return "\n".join(lines)
 
 
 def build_runtime_info() -> str:
@@ -354,4 +412,4 @@ def build_runtime_info() -> str:
 Host: {platform.node()}
 OS: {platform.system()} {platform.release()}
 Python: {platform.python_version()}
-Framework: Xuanwu v0.1.0"""
+Framework: XuanWu v0.1.0"""

@@ -110,4 +110,3 @@ async def test_hook_runtime_confirm_promotes_memory(tmp_path):
     assert "Review failure" in content
     confirmed_items = await runtime.context_sink.list_confirmed("audit", "user-a")
     assert len(confirmed_items) == 1
-

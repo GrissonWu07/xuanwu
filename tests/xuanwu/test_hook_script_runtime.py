@@ -169,4 +169,3 @@ print(json.dumps({
     assert context_items[0].summary == "Recent note"
     assert len(memory_files) == 1
     assert "Persisted from script" in memory_files[0].read_text(encoding="utf-8")
-

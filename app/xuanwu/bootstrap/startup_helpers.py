@@ -45,13 +45,13 @@ def scan_plugin_names(root: Path, *, md_skill_mode: bool = False) -> list[str]:
 def print_root_plugins(label: str, root: Path, plugins: list[str]) -> None:
     """Print configured root path and discovered plugin names."""
     if not root.exists():
-        print(f"[Xuanwu] {label}: {root} (not found)")
+        print(f"[XuanWu] {label}: {root} (not found)")
         return
 
     if plugins:
-        print(f"[Xuanwu] {label}: {root} ({len(plugins)}) -> {', '.join(plugins)}")
+        print(f"[XuanWu] {label}: {root} ({len(plugins)}) -> {', '.join(plugins)}")
     else:
-        print(f"[Xuanwu] {label}: {root} (0) -> (none)")
+        print(f"[XuanWu] {label}: {root} (0) -> (none)")
 
 
 def check_and_prompt_for_providers(providers_root: Path) -> None:
@@ -67,7 +67,7 @@ def check_and_prompt_for_providers(providers_root: Path) -> None:
 
     if _is_empty_or_missing(providers_root):
         print("\n" + "=" * 70)
-        print("[Xuanwu] NOTICE: providers_root directory is empty")
+        print("[XuanWu] NOTICE: providers_root directory is empty")
         print("=" * 70)
         print(f"  - Providers root is empty: {providers_root}")
         print("\nTo get started with providers and skills, please run:")
@@ -151,7 +151,7 @@ def build_token_entries(config) -> tuple[list[TokenEntry], Optional[str]]:
     if tokens:
         primary_id = config.model.primary
         if primary_id and not any(token.token_id == primary_id for token in tokens):
-            print(f"[Xuanwu] Warning: primary token '{primary_id}' not found in tokens[], using first token")
+            print(f"[XuanWu] Warning: primary token '{primary_id}' not found in tokens[], using first token")
             primary_id = tokens[0].token_id
         elif not primary_id:
             primary_id = tokens[0].token_id
@@ -324,4 +324,4 @@ async def ensure_default_local_admin(config) -> None:
             ),
         )
 
-    print(f"[Xuanwu] Created default local admin user: {username}")
+    print(f"[XuanWu] Created default local admin user: {username}")

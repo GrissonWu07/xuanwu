@@ -96,10 +96,10 @@ class LocalAuthConfig(BaseModel):
 
 
 class JWTAuthConfig(BaseModel):
-    """Xuanwu local JWT configuration."""
+    """XuanWu local JWT configuration."""
 
-    header_name: str = "Xuanwu-Authenticate"
-    cookie_name: str = "Xuanwu-Authenticate"
+    header_name: str = "XuanWu-Authenticate"
+    cookie_name: str = "XuanWu-Authenticate"
     issuer: str = "xuanwu"
     secret_key: str = DEFAULT_JWT_SECRET
     expires_minutes: int = 480
@@ -129,7 +129,7 @@ class AuthConfig(BaseModel):
     """Top-level auth configuration block in xuanwu.json."""
     enabled: bool = True          # Set to false to disable auth (anonymous mode)
     provider: str = "none"
-    header_name: str = "Xuanwu-Authenticate"
+    header_name: str = "XuanWu-Authenticate"
     token_prefix: str = ""
     cache_ttl_seconds: int = 300
 

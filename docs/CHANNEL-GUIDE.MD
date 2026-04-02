@@ -1,8 +1,8 @@
-# Xuanwu Channel Integration Guide
+# XuanWu Channel Integration Guide
 
 ## Overview
 
-Xuanwu Channel system provides a unified interface to integrate with various enterprise messaging platforms. Channels enable your AI agent to communicate with users through their preferred IM platforms.
+XuanWu Channel system provides a unified interface to integrate with various enterprise messaging platforms. Channels enable your AI agent to communicate with users through their preferred IM platforms.
 
 ### Supported Platforms
 
@@ -14,12 +14,12 @@ Xuanwu Channel system provides a unified interface to integrate with various ent
 
 ### Connection Modes
 
-Xuanwu supports multiple connection modes for IM platform integration:
+XuanWu supports multiple connection modes for IM platform integration:
 
 | Mode | Direction | Pros | Cons |
 |------|-----------|------|------|
-| **Long Connection** | Xuanwu -> Platform | Real-time, no public URL needed, auto-reconnect | Requires SDK dependency |
-| **Webhook** | Platform -> Xuanwu | Simple setup, no SDK needed | Requires public URL, callback configuration |
+| **Long Connection** | XuanWu -> Platform | Real-time, no public URL needed, auto-reconnect | Requires SDK dependency |
+| **Webhook** | Platform -> XuanWu | Simple setup, no SDK needed | Requires public URL, callback configuration |
 | **Application API** | Bidirectional | Full API access, supports more features | Requires callback URL configuration |
 
 **Recommendation:** Use **Long Connection** mode (WebSocket/Stream) whenever possible. It is more reliable, does not require exposing your server to the internet, and handles reconnection automatically.
@@ -31,7 +31,7 @@ Xuanwu supports multiple connection modes for IM platform integration:
 | Feature | Feishu | DingTalk | WeCom |
 |---------|--------|----------|-------|
 | Long Connection / Stream | Yes (SDK) | Yes (Stream) | Yes (WebSocket) |
-| Webhook | Planned | Yes | Yes |
+| Webhook | Yes | Yes | Yes |
 | Application API | No | No | Yes |
 | Streaming Reply | No | No | Yes |
 | Markdown Support | Limited | No | Yes |
@@ -84,7 +84,7 @@ The general workflow for setting up any channel:
 
 Channel traffic must build canonical `SessionKey` values instead of ad-hoc strings.
 
-- `user_id` is the Xuanwu user who owns the channel connection
+- `user_id` is the XuanWu user who owns the channel connection
 - `account_id` is the concrete channel connection ID
 - Direct messages use the external sender as `peer_id`
 - Group chats use the group or conversation ID as `peer_id`
@@ -95,7 +95,7 @@ Channel traffic must build canonical `SessionKey` values instead of ad-hoc strin
 Before enabling a connection, you can verify that your credentials are correct:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/{type}/connections/{id}/verify"
+curl -X POST "http://localhost:9000/api/channels/{type}/connections/{id}/verify"
 ```
 
 **Response (Success):**
@@ -120,13 +120,13 @@ This tests your configuration without fully connecting, helping you catch creden
 
 ## Web UI - Channel Management
 
-Xuanwu provides a web-based interface for managing channel connections without using the API directly.
+XuanWu provides a web-based interface for managing channel connections without using the API directly.
 
 ### Accessing the Web UI
 
 Navigate to:
 ```
-http://your-host:8000/channels.html
+http://your-host:9000/channels.html
 ```
 
 ### Features
@@ -186,20 +186,20 @@ You can use **either** the Web UI **or** the API to manage connections - both wo
 
 ### Overview
 
-Feishu (also known as Lark internationally) integration currently supports Long Connection mode only.
+Feishu (also known as Lark internationally) integration supports both Long Connection and Webhook modes.
 
 | Mode | Config Key | Description | Status |
 |------|------------|-------------|--------|
 | **Long Connection** (Recommended) | `longconnection` | WebSocket-based, real-time, no callback URL needed | Supported |
-| **Webhook** | `webhook` | HTTP callback, requires public URL | **Planned - Not Yet Implemented** |
+| **Webhook** | `webhook` | HTTP callback, requires public URL | Supported |
 
-> **Note:** Webhook mode is planned but not yet implemented in the current codebase. The schema includes webhook fields for forward compatibility, but only Long Connection mode is functional. If you need webhook functionality, please use DingTalk or WeCom.
+> **Note:** In Webhook mode, inbound messages are received via `/api/channel-hooks/feishu/{connection_id}` and outbound replies are sent through the configured `webhook_url`.
 
 **Dependency:** `lark-oapi >= 1.5.0` (for Long Connection mode)
 
 ### Prerequisites
 
-Before configuring Xuanwu, you need to create and configure an application on Feishu Open Platform.
+Before configuring XuanWu, you need to create and configure an application on Feishu Open Platform.
 
 #### Step 1: Create Application
 
@@ -207,7 +207,7 @@ Before configuring Xuanwu, you need to create and configure an application on Fe
 2. Log in with your Feishu account
 3. Click **"Create Custom App"**
 4. Fill in:
-   - **App Name:** Your bot name (e.g., "Xuanwu Bot")
+   - **App Name:** Your bot name (e.g., "XuanWu Bot")
    - **App Description:** Brief description
    - **App Icon:** Upload an icon (optional)
 5. Click **"Create"**
@@ -252,7 +252,7 @@ From your app's **"Credentials & Basic Info"** page, copy:
 Create a connection using the API:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
+curl -X POST "http://localhost:9000/api/channels/feishu/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Feishu Bot",
@@ -286,14 +286,12 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
 | `app_id` | Yes | Feishu App ID (starts with `cli_`) |
 | `app_secret` | Yes | Feishu App Secret |
 
-#### Webhook Mode (Planned - Not Yet Implemented)
-
-> **Warning:** This mode is not yet functional. The configuration is documented here for future reference only.
+#### Webhook Mode
 
 For webhook mode, you would need a publicly accessible URL:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
+curl -X POST "http://localhost:9000/api/channels/feishu/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Feishu Webhook Bot",
@@ -304,12 +302,15 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
   }'
 ```
 
-**Configuration Fields (Future):**
+**Configuration Fields:**
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `connection_mode` | Yes | Set to `webhook` |
 | `webhook_url` | Yes | Your public webhook URL |
+| `verification_token` | No | Validate inbound callback `token` when provided |
+| `encrypt_key` | No | Validate inbound `X-Lark-Signature` when provided |
+| `require_at_mention_in_group` | No | If `true`, group messages are processed only when bot is @mentioned |
 
 ### Configuration Schema
 
@@ -376,7 +377,7 @@ The complete schema returned by `GET /api/channels/feishu/schema`:
 #### Enable the Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections/{connection_id}/enable"
+curl -X POST "http://localhost:9000/api/channels/feishu/connections/{connection_id}/enable"
 ```
 
 **Response:**
@@ -391,13 +392,13 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections/{connection_
 
 1. In Feishu, add your bot to a group or start a direct chat with it
 2. Send a message: `@YourBot Hello`
-3. Check Xuanwu logs for incoming message
+3. Check XuanWu logs for incoming message
 4. The agent should respond automatically
 
 #### Verify Connection Status
 
 ```bash
-curl "http://localhost:8000/api/channels/feishu/connections/{connection_id}"
+curl "http://localhost:9000/api/channels/feishu/connections/{connection_id}"
 ```
 
 ### Troubleshooting
@@ -409,7 +410,7 @@ curl "http://localhost:8000/api/channels/feishu/connections/{connection_id}"
 | No messages received | Missing permissions | Ensure all required permissions are granted |
 | No messages received | Bot not in chat | Add bot to the group or start DM with it |
 | Cannot send replies | Missing send permission | Add `im:message:send_as_bot` permission |
-| WebSocket disconnects | Network issues | Check firewall, Xuanwu will auto-reconnect |
+| WebSocket disconnects | Network issues | Check firewall, XuanWu will auto-reconnect |
 | "App not installed" error | App not installed | Install app in workspace after publishing |
 | "Multiprocessing error" | Environment restrictions | Check if running in Docker or cloud environments that restrict multiprocessing; ensure `spawn` or `fork` is available |
 | SDK process dies immediately | Python version mismatch | Ensure Python 3.9+ and compatible `lark-oapi` version |
@@ -435,7 +436,7 @@ When using Stream mode, each incoming message carries a temporary `session_webho
 
 - **Validity Period:** The session webhook is only valid for approximately **15 minutes** after the message is received
 - **One-time Use:** Designed for replying to the specific message that triggered it
-- **Automatic Fallback:** If the session webhook expires, Xuanwu will attempt to use your configured custom webhook URL
+- **Automatic Fallback:** If the session webhook expires, XuanWu will attempt to use your configured custom webhook URL
 
 **Recommendation:** If your agent processing may take longer than 15 minutes, configure a custom `webhook_url` as a fallback.
 
@@ -491,7 +492,7 @@ From your app's **"Basic Information"** or **"Robot"** settings, copy:
 #### Stream Mode (Recommended)
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/dingtalk/connections" \
+curl -X POST "http://localhost:9000/api/channels/dingtalk/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My DingTalk Bot",
@@ -518,7 +519,7 @@ curl -X POST "http://localhost:8000/api/channels/dingtalk/connections" \
 For webhook mode with optional signature verification:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/dingtalk/connections" \
+curl -X POST "http://localhost:9000/api/channels/dingtalk/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "DingTalk Webhook Bot",
@@ -620,7 +621,7 @@ If the session webhook has expired and no custom webhook is configured, the repl
 #### Enable the Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/dingtalk/connections/{connection_id}/enable"
+curl -X POST "http://localhost:9000/api/channels/dingtalk/connections/{connection_id}/enable"
 ```
 
 #### Test Message Flow
@@ -640,7 +641,7 @@ curl -X POST "http://localhost:8000/api/channels/dingtalk/connections/{connectio
 | Messages not received | Robot not in Stream mode | Check robot settings in DingTalk console, enable Stream mode |
 | Cannot reply | Session webhook expired | Session webhooks expire after ~15 minutes; configure a custom webhook as fallback |
 | Reply not sent | Session webhook may have expired | Check if processing took >15 minutes |
-| Messages sent but no reply visible | Reply sent to wrong endpoint | Verify session_webhook in metadata; check Xuanwu logs |
+| Messages sent but no reply visible | Reply sent to wrong endpoint | Verify session_webhook in metadata; check XuanWu logs |
 | "Permission denied" | Missing permissions | Add required permissions in DingTalk console |
 | Robot not responding | Robot not activated | Publish app version and grant permissions |
 
@@ -711,7 +712,7 @@ If using Application API mode:
 #### WebSocket Mode (Recommended)
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
+curl -X POST "http://localhost:9000/api/channels/wecom/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My WeCom Bot",
@@ -736,7 +737,7 @@ curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
 #### Webhook Mode
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
+curl -X POST "http://localhost:9000/api/channels/wecom/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "WeCom Webhook Bot",
@@ -759,7 +760,7 @@ curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
 For full bidirectional messaging via the WeCom API:
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/wecom/connections" \
+curl -X POST "http://localhost:9000/api/channels/wecom/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "WeCom App Bot",
@@ -873,14 +874,14 @@ The complete schema returned by `GET /api/channels/wecom/schema`:
 #### Enable the Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/wecom/connections/{connection_id}/enable"
+curl -X POST "http://localhost:9000/api/channels/wecom/connections/{connection_id}/enable"
 ```
 
 #### Test Message Flow
 
 1. In WeCom, find your bot in contacts or add it to a group
 2. Send a test message
-3. Check Xuanwu logs for incoming message
+3. Check XuanWu logs for incoming message
 4. The agent should respond
 
 #### Test Streaming Response
@@ -921,7 +922,7 @@ A: Yes. You can create multiple connections for the same platform (e.g., multipl
 
 A: Use the `/verify` endpoint to test your credentials:
 ```bash
-curl -X POST "http://localhost:8000/api/channels/{type}/connections/{id}/verify"
+curl -X POST "http://localhost:9000/api/channels/{type}/connections/{id}/verify"
 ```
 This validates your configuration without connecting or sending messages.
 
@@ -931,13 +932,13 @@ A: No, there is no automatic retry mechanism. If a send fails, the error is retu
 
 **Q: How are credentials stored?**
 
-A: All sensitive credentials (app secrets, tokens) are encrypted using AES-256-GCM before being stored in the database. The encryption key is derived from your Xuanwu configuration.
+A: All sensitive credentials (app secrets, tokens) are encrypted using AES-256-GCM before being stored in the database. The encryption key is derived from your XuanWu configuration.
 
 **Q: Can I switch connection modes without recreating the connection?**
 
 A: Yes. Use the PATCH API or the Web UI Edit function to update the configuration:
 ```bash
-curl -X PATCH "http://localhost:8000/api/channels/{type}/connections/{id}" \
+curl -X PATCH "http://localhost:9000/api/channels/{type}/connections/{id}" \
   -H "Content-Type: application/json" \
   -d '{
     "config": {
@@ -1005,7 +1006,7 @@ The GET endpoint handles challenge verification for platforms like Feishu that r
 #### List Channel Types
 
 ```bash
-curl "http://localhost:8000/api/channels"
+curl "http://localhost:9000/api/channels"
 ```
 
 **Response:**
@@ -1038,7 +1039,7 @@ curl "http://localhost:8000/api/channels"
 #### Get Configuration Schema
 
 ```bash
-curl "http://localhost:8000/api/channels/feishu/schema"
+curl "http://localhost:9000/api/channels/feishu/schema"
 ```
 
 **Response:** See platform-specific Configuration Schema sections above.
@@ -1046,7 +1047,7 @@ curl "http://localhost:8000/api/channels/feishu/schema"
 #### Create Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
+curl -X POST "http://localhost:9000/api/channels/feishu/connections" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Production Bot",
@@ -1076,7 +1077,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections" \
 #### Verify Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4/verify"
+curl -X POST "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4/verify"
 ```
 
 **Response (Success):**
@@ -1098,7 +1099,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d
 #### Enable Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4/enable"
+curl -X POST "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4/enable"
 ```
 
 **Response:**
@@ -1112,7 +1113,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d
 #### Disable Connection
 
 ```bash
-curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4/disable"
+curl -X POST "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4/disable"
 ```
 
 **Response:**
@@ -1126,7 +1127,7 @@ curl -X POST "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d
 #### Update Connection
 
 ```bash
-curl -X PATCH "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4" \
+curl -X PATCH "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Renamed Bot",
@@ -1141,7 +1142,7 @@ curl -X PATCH "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3
 #### Delete Connection
 
 ```bash
-curl -X DELETE "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c3d4"
+curl -X DELETE "http://localhost:9000/api/channels/feishu/connections/conn_a1b2c3d4"
 ```
 
 **Response:**
@@ -1160,7 +1161,7 @@ curl -X DELETE "http://localhost:8000/api/channels/feishu/connections/conn_a1b2c
 
 ```
 +-----------------------------------------------------------------------------+
-|                       Xuanwu Channel Architecture                         |
+|                       XuanWu Channel Architecture                         |
 +-----------------------------------------------------------------------------+
 |                                                                              |
 |  +----------------+     +----------------+     +----------------------+      |
@@ -1261,7 +1262,7 @@ All channel handlers implement this interface:
 
 ## Summary
 
-Xuanwu Channel system provides:
+XuanWu Channel system provides:
 
 1. **Unified Interface** - All channels implement the same ChannelHandler interface
 2. **Multiple Platforms** - Support for Feishu, DingTalk, WeCom out of the box
@@ -1276,6 +1277,6 @@ For any platform integration, follow the same pattern:
 1. Create app on platform console
 2. Configure permissions
 3. Get credentials
-4. Create connection in Xuanwu (via API or Web UI)
+4. Create connection in XuanWu (via API or Web UI)
 5. Verify configuration
 6. Enable and test

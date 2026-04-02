@@ -17,8 +17,13 @@ GROUP_PROVIDERS = "group:providers"
 
 # Tools included in each logical group.
 GROUP_TOOLS: dict[str, list[str]] = {
-    GROUP_FS: [],
-    GROUP_RUNTIME: ["xuanwu_runtime_status", "xuanwu_runtime_call"],
+    GROUP_FS: [
+        "present_files",
+        "export_docx",
+        "export_pptx",
+        "export_pdf",
+    ],
+    GROUP_RUNTIME: [],
     GROUP_WEB: ["web_search", "web_fetch"],
     GROUP_MEMORY: ["memory_search", "memory_get"],
     GROUP_SESSIONS: [

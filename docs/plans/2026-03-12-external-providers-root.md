@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Move Xuanwu provider discovery to a configurable external `providers_root` and remove the built-in provider directory dependency.
+**Goal:** Move XuanWu provider discovery to a configurable external `providers_root` and remove the built-in provider directory dependency.
 
 **Architecture:** Add a top-level config field that points to the providers repository, resolve it against the loaded config file directory, and use it consistently for provider template discovery and markdown skill loading during application startup. Keep a matching schema default so existing configs without the new key still start against the external repo layout.
 
@@ -19,7 +19,7 @@
 
 **Step 1: Add the new schema field**
 
-Add a top-level `providers_root: str` field to `XuanwuConfig` with default `../providers`.
+Add a top-level `providers_root: str` field to `XuanWuConfig` with default `../providers`.
 
 **Step 2: Update shipped config**
 

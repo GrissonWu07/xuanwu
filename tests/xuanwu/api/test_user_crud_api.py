@@ -124,8 +124,8 @@ def _get_auth_config() -> AuthConfig:
         jwt={
             "secret_key": "test-secret-key-for-testing",
             "issuer": "xuanwu-test",
-            "header_name": "Xuanwu-Authenticate",
-            "cookie_name": "Xuanwu-Authenticate",
+            "header_name": "XuanWu-Authenticate",
+            "cookie_name": "XuanWu-Authenticate",
             "expires_minutes": 60,
         },
     )
@@ -163,7 +163,7 @@ class TestUserCRUDAPI:
                 "is_active": True,
                 "is_admin": False,
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 201
@@ -185,7 +185,7 @@ class TestUserCRUDAPI:
         # First page
         resp = client.get(
             "/api/users?page=1&page_size=1",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -196,7 +196,7 @@ class TestUserCRUDAPI:
         # Second page
         resp = client.get(
             "/api/users?page=2&page_size=1",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -215,7 +215,7 @@ class TestUserCRUDAPI:
         # Search by username
         resp = client.get(
             "/api/users?search=regular",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -226,7 +226,7 @@ class TestUserCRUDAPI:
         # Search by email
         resp = client.get(
             "/api/users?search=admin@test",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -245,14 +245,14 @@ class TestUserCRUDAPI:
         # Get list to find a user ID
         list_resp = client.get(
             "/api/users",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
         user_id = list_resp.json()["users"][0]["id"]
 
         # Get by ID
         resp = client.get(
             f"/api/users/{user_id}",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -270,7 +270,7 @@ class TestUserCRUDAPI:
         # Get regular user ID
         list_resp = client.get(
             "/api/users?search=regularuser",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
         user_id = list_resp.json()["users"][0]["id"]
 
@@ -281,7 +281,7 @@ class TestUserCRUDAPI:
                 "display_name": "Updated Display Name",
                 "email": "updated@test.com",
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -305,14 +305,14 @@ class TestUserCRUDAPI:
                 "password": "deletepass123",
                 "display_name": "To Delete",
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
         user_id = create_resp.json()["id"]
 
         # Delete user
         resp = client.delete(
             f"/api/users/{user_id}",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 204
@@ -320,7 +320,7 @@ class TestUserCRUDAPI:
         # Verify user is deleted
         get_resp = client.get(
             f"/api/users/{user_id}",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
         assert get_resp.status_code == 404
 
@@ -340,7 +340,7 @@ class TestUserCRUDAPI:
                 "username": "newuser",
                 "password": "newuserpass123",
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 403
@@ -356,7 +356,7 @@ class TestUserCRUDAPI:
 
         resp = client.get(
             "/api/users",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 403
@@ -373,14 +373,14 @@ class TestUserCRUDAPI:
         # Get admin user ID
         list_resp = client.get(
             "/api/users?search=admin",
-            headers={"Xuanwu-Authenticate": admin_token},
+            headers={"XuanWu-Authenticate": admin_token},
         )
         admin_id = list_resp.json()["users"][0]["id"]
 
         # Try to delete as non-admin
         resp = client.delete(
             f"/api/users/{admin_id}",
-            headers={"Xuanwu-Authenticate": user_token},
+            headers={"XuanWu-Authenticate": user_token},
         )
 
         assert resp.status_code == 403
@@ -415,7 +415,7 @@ class TestUserCRUDAPI:
 
         resp = client.get(
             "/api/users",
-            headers={"Xuanwu-Authenticate": "invalid-token"},
+            headers={"XuanWu-Authenticate": "invalid-token"},
         )
 
         assert resp.status_code == 401
@@ -436,7 +436,7 @@ class TestUserCRUDAPI:
                 "username": "admin",
                 "password": "anotherpass123",
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 409
@@ -457,7 +457,7 @@ class TestUserCRUDAPI:
                 "password": "somepass123",
                 "email": "admin@test.com",  # Duplicate email
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 409
@@ -474,14 +474,14 @@ class TestUserCRUDAPI:
         # Get admin's own user ID
         list_resp = client.get(
             "/api/users?search=admin",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
         admin_id = list_resp.json()["users"][0]["id"]
 
         # Try to delete self
         resp = client.delete(
             f"/api/users/{admin_id}",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 400
@@ -498,7 +498,7 @@ class TestUserCRUDAPI:
         resp = client.put(
             "/api/users/nonexistent-id-12345",
             json={"display_name": "Test"},
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 404
@@ -513,7 +513,7 @@ class TestUserCRUDAPI:
 
         resp = client.delete(
             "/api/users/nonexistent-id-12345",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 404
@@ -528,7 +528,7 @@ class TestUserCRUDAPI:
 
         resp = client.get(
             "/api/users/nonexistent-id-12345",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 404

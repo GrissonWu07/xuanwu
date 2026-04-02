@@ -1,4 +1,4 @@
-# Xuanwu Skill Development Guide
+# XuanWu Skill Development Guide
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@
 
 ### What is a Skill?
 
-A **Skill** in Xuanwu is a discrete unit of functionality that the AI Agent can execute. Skills encapsulate:
+A **Skill** in XuanWu is a discrete unit of functionality that the AI Agent can execute. Skills encapsulate:
 
 - **Capability Definition** - What the Skill can do
 - **Input Parameters** - What data the Skill needs
@@ -274,7 +274,7 @@ Skills can be deployed to multiple locations, with different priorities:
 **Location**: `app/xuanwu/skills/built_in/`
 
 **Characteristics**:
-- Shipped with Xuanwu Core
+- Shipped with XuanWu Core
 - Core functionality
 - Updated with Core releases
 
@@ -322,7 +322,7 @@ Copy the Skill directory to the target location.
 
 #### Step 6: Verify Loading
 
-Restart Xuanwu or trigger Skill reload to verify.
+Restart XuanWu or trigger Skill reload to verify.
 
 ### Hot Reloading
 
@@ -341,7 +341,7 @@ Skills support hot reloading in development mode:
 
 #### 1. Search Path Resolution
 
-Xuanwu searches for Skills in the following order:
+XuanWu searches for Skills in the following order:
 
 1. **Workspace Skills** - `{workspace}/skills/` (for development)
 2. **Skills Root** - `{skills_root}/` (third-party skills, configured via skills_root)
@@ -703,14 +703,14 @@ export LOG_LEVEL=DEBUG
 
 Query loaded Skills:
 ```bash
-curl http://localhost:8000/api/skills
+curl http://localhost:9000/api/skills
 ```
 
 #### Test Skill Directly
 
 Test Skill via API:
 ```bash
-curl -X POST http://localhost:8000/api/skills/execute \
+curl -X POST http://localhost:9000/api/skills/execute \
   -H "Content-Type: application/json" \
   -d '{"skill": "my-skill", "params": {}}'
 ```
@@ -725,7 +725,7 @@ tail -f logs/xuanwu.log
 ### Getting Help
 
 Resources for Skill development:
-- [Xuanwu Documentation](./PROJECT_OVERVIEW.MD)
+- [XuanWu Documentation](./PROJECT_OVERVIEW.MD)
 - [Provider Guide](./PROVIDER-GUIDE.MD)
 - [Example Skills](../app/xuanwu/skills/built_in/)
 - [Community Forum](https://github.com/xuanwu/xuanwu/discussions)
@@ -749,7 +749,7 @@ Resources for Skill development:
 2. Write SKILL.md with metadata
 3. Implement handler (if executable)
 4. Deploy to workspace or user directory
-5. Restart Xuanwu or trigger reload
+5. Restart XuanWu or trigger reload
 6. Verify via API
 7. Test with Agent
 

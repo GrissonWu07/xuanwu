@@ -105,4 +105,3 @@ async def test_hook_state_store_reject_records_decision_and_hides_pending(tmp_pa
     decisions = await store.list_decisions("audit", "user-a")
     assert len(decisions) == 1
     assert decisions[0].decision == "reject"
-

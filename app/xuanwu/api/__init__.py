@@ -1,7 +1,7 @@
-"""API package for Xuanwu transport integrations.
+"""API package for XuanWu transport integrations.
 
 This package exposes the REST router plus the WebSocket and SSE managers used
-by the Xuanwu runtime.
+by the XuanWu runtime.
 """
 
 from .routes import create_router, APIContext

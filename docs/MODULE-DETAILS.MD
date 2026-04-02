@@ -1,6 +1,6 @@
-# Xuanwu Module Details
+# XuanWu Module Details
 
-> **Canonical per-module API reference for the Xuanwu enterprise agent framework.**
+> **Canonical per-module API reference for the XuanWu enterprise agent framework.**
 > All future development and feature changes MUST consult this document.
 >
 > Related documents:
@@ -51,19 +51,19 @@ Singleton configuration manager with a 6-level priority chain.
 
 | Method | Signature | Description |
 |---|---|---|
-| `load` | `() -> XuanwuConfig` | Multi-source config loading; lazy on first access |
-| `reload` | `() -> XuanwuConfig` | Force reload from all sources |
+| `load` | `() -> XuanWuConfig` | Multi-source config loading; lazy on first access |
+| `reload` | `() -> XuanWuConfig` | Force reload from all sources |
 | `set` | `(key: str, value: Any) -> None` | Runtime override with dotted key path (e.g. `"agent_defaults.timeout_seconds"`) |
 | `get` | `(key: str, default: Any) -> Any` | Get nested config value by dotted key |
 | `load_user_config` | `(user_id: str) -> dict` | Load per-user configuration from `<workspace>/users/<user_id>/xuanwu.json` |
 
 **Properties**:
-- `config: XuanwuConfig` — Lazily loaded configuration object
+- `config: XuanWuConfig` — Lazily loaded configuration object
 - `resolved_config_path: Optional[Path]` — Absolute path of the loaded config file
 
 **Module-Level Functions**:
 - `get_config_manager() -> ConfigManager` — Get singleton instance
-- `get_config() -> XuanwuConfig` — Shorthand for `get_config_manager().config`
+- `get_config() -> XuanWuConfig` — Shorthand for `get_config_manager().config`
 - `get_config_path() -> Optional[Path]` — Get resolved config file path
 
 ### 1.2 SkillDeps (`core/deps.py`)
@@ -117,7 +117,7 @@ Pydantic models defining all configuration sections.
 
 | Model | Key Fields (with defaults) |
 |---|---|
-| `XuanwuConfig` | `log_level=INFO`, `workspace`, `agents_dir`, `providers_root`, `agent_defaults`, `messages`, `compaction`, `block_chunker`, `model`, `retry`, `memory`, `sandbox`, `security`, `skills`, `reset`, `webhook`, `auth`, `service_providers` |
+| `XuanWuConfig` | `log_level=INFO`, `workspace`, `agents_dir`, `providers_root`, `agent_defaults`, `messages`, `compaction`, `block_chunker`, `model`, `retry`, `memory`, `sandbox`, `security`, `skills`, `reset`, `webhook`, `auth`, `service_providers` |
 | `QueueConfig` | `mode=COLLECT`, `debounce_ms=1000`, `cap=20`, `drop=OLD` |
 | `ResetConfig` | `mode=DAILY`, `daily_hour=4`, `idle_minutes=60` |
 | `CompactionConfig` | `reserve_tokens_floor=20000`, `soft_threshold_tokens=4000`, `context_window=128000`, `memory_flush_enabled=True` |
@@ -125,8 +125,8 @@ Pydantic models defining all configuration sections.
 | `HumanDelayConfig` | `mode=OFF`, `min_ms=800`, `max_ms=2500` |
 | `SandboxConfig` | `enabled=False`, `mode=OFF`, `workspace_root=""`, `elevated_exec=False` |
 | `SecurityPolicyConfig` | `allowed_tools=[]`, `denied_tools=[]`, `workspace_access="rw"` |
-| `SkillsConfig` | `md_skills_max_count=20`, `md_skills_desc_max_chars=200`, `md_skills_index_max_chars=3000`, `md_skills_max_file_bytes=262144`, `allow_script_execution=False` |
-| `WebhookConfig` | `enabled=False`, `header_name="X-Xuanwu-SK"`, `systems=[]` |
+| `SkillsConfig` | `md_skills_max_count=20`, `md_skills_desc_max_chars=200`, `md_skills_index_max_chars=3000`, `md_skills_max_file_bytes=262144` |
+| `WebhookConfig` | `enabled=False`, `header_name="X-XuanWu-SK"`, `systems=[]` |
 | `WebhookSystemConfig` | `system_id`, `enabled=True`, `sk_env`, `default_agent_id="main"`, `allowed_skills=[]` |
 | `ModelConfig` | `primary="doubao-pro-32k"`, `fallbacks=[]`, `temperature=0.7`, `max_tokens=None`, `providers={}` |
 | `RetryConfig` | `attempts=3`, `min_delay_ms=1000`, `max_delay_ms=30000`, `jitter=0.1` |
@@ -495,7 +495,7 @@ Constructor: `strategy: AuthStrategy`, `anonymous_fallback: bool = False`, `oidc
 
 **Credential Extraction Order**:
 1. `Authorization: Bearer <token>` header
-2. `Xuanwu-Authenticate` header
+2. `XuanWu-Authenticate` header
 3. Cookie-based tokens (configurable via `jwt.cookie_name`)
 
 **Skip Paths** (no auth required): `/health`, `/ping`, `/favicon.ico`, `/docs`, `/openapi.json`, `/static/`, `/styles/`, `/scripts/`, `/locales/`, `/config.json`, `/index.html`, `/login.html`, `/api/auth/login`, `/api/auth/local/login`, `/api/auth/callback`, `/api/auth/logout`, `/api/auth/me`
@@ -672,7 +672,7 @@ Constructor: `min_chars=800`, `max_chars=1200`, `break_preference=PARAGRAPH`, `i
 | `user_timezone` | `None` | User timezone |
 | `time_format` | `"auto"` | Time format (auto/12/24) |
 | `sandbox` | `SandboxConfig()` | Sandbox settings |
-| `agent_name` | `"Xuanwu"` | Agent display name |
+| `agent_name` | `"XuanWu"` | Agent display name |
 | `agent_description` | `"Enterprise AI Assistant"` | Agent description |
 | `md_skills_max_index_chars` | `3000` | Max MD skills index size |
 | `md_skills_desc_max_chars` | `200` | Max per-skill description size |
@@ -1475,6 +1475,64 @@ Responsibilities:
 
 This module exists to exercise the generic runtime end-to-end. It is not a
 special-case skill engine and does not add domain-specific learning semantics to the core.
+
+### 10.8 Heartbeat Integration
+
+Hook Runtime is a downstream consumer of heartbeat events rather than the heartbeat scheduler.
+
+Heartbeat bridge utilities convert heartbeat outcomes into generic hook runtime events while
+preserving available routing metadata such as:
+
+- `session_key`
+- `run_id`
+- `channel`
+- `account_id`
+
+This allows web chat, hook scripts, and future notification consumers to react to heartbeat
+results without coupling heartbeat directly to any one delivery channel.
+
+## 10A. Heartbeat Module
+
+**Path**: `app/atlasclaw/heartbeat/`
+
+Provides unified periodic execution for agent-side heartbeat turns and long-lived channel
+connection checks.
+
+### 10A.1 Runtime Core
+
+| Component | Purpose |
+|---|---|
+| `HeartbeatRuntime` | Schedules due jobs, enforces concurrency, persists state, emits events |
+| `HeartbeatRuntimeContext` | Injects executors, store, and event-bridge behavior |
+| `HeartbeatStateStore` | Persists job definitions, state snapshots, and local heartbeat event logs |
+| `HeartbeatTargetResolver` | Resolves delivery targets such as `user_chat`, `group_chat`, `session`, and `thread` |
+
+### 10A.2 Models
+
+| Model / Enum | Purpose |
+|---|---|
+| `HeartbeatJobType` | `agent_turn` / `channel_connection` |
+| `HeartbeatTargetType` | `none`, `last_active`, `user_chat`, `channel_connection`, `group_chat`, `session`, `thread` |
+| `HeartbeatDeliveryMode` | Delivery semantics including `summary_only` |
+| `HeartbeatEventType` | Heartbeat runtime event taxonomy |
+| `HeartbeatJobDefinition` | Normalized heartbeat job definition |
+| `HeartbeatJobStateSnapshot` | Durable health and scheduling state |
+| `HeartbeatEventEnvelope` | Persisted heartbeat event payload |
+
+### 10A.3 Executors
+
+| Executor | Description |
+|---|---|
+| `AgentHeartbeatExecutor` | Executes OpenClaw-style heartbeat turns, normalizes `HEARTBEAT_OK`, returns context payloads |
+| `ChannelHeartbeatExecutor` | Probes and reconnects long-lived channel connections, tracks quiet retries and degraded state |
+
+### 10A.4 Storage
+
+Per-user heartbeat storage layout:
+
+- `<workspace>/users/<user_id>/heartbeat/jobs.json`
+- `<workspace>/users/<user_id>/heartbeat/state.json`
+- `<workspace>/users/<user_id>/heartbeat/events.jsonl`
 
 ## 11. Database Module
 

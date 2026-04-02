@@ -1,6 +1,6 @@
-# Xuanwu Enterprise Deployment Guide
+# XuanWu Enterprise Deployment Guide
 
-> **For Enterprise Customers**: This guide provides instructions for deploying Xuanwu using Docker Compose with MySQL 8.5.
+> **For Enterprise Customers**: This guide provides instructions for deploying XuanWu using Docker Compose with MySQL 8.5.
 
 ---
 
@@ -73,8 +73,8 @@ Create `/opt/xuanwu/config/xuanwu.json`:
       "secret_key": "${JWT_SECRET_KEY}",
       "expires_minutes": 1440,
       "issuer": "xuanwu",
-      "header_name": "Xuanwu-Authenticate",
-      "cookie_name": "Xuanwu-Auth"
+      "header_name": "XuanWu-Authenticate",
+      "cookie_name": "XuanWu-Auth"
     }
   },
   "encryption": {
@@ -95,7 +95,7 @@ services:
     image: xuanwu-core:latest
     container_name: xuanwu
     ports:
-      - "8000:8000"
+      - "9000:9000"
     volumes:
       - ./config/xuanwu.json:/app/xuanwu.json:ro
       - ./data:/app/data
@@ -105,7 +105,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -154,7 +154,7 @@ docker-compose exec xuanwu alembic upgrade head
 docker-compose ps
 
 # Health check
-curl http://localhost:8000/api/health
+curl http://localhost:9000/api/health
 # Expected: {"status": "healthy", "timestamp": "..."}
 ```
 
@@ -215,8 +215,8 @@ curl http://localhost:8000/api/health
       "secret_key": "${JWT_SECRET_KEY}",
       "expires_minutes": 1440,
       "issuer": "xuanwu",
-      "header_name": "Xuanwu-Authenticate",
-      "cookie_name": "Xuanwu-Auth"
+      "header_name": "XuanWu-Authenticate",
+      "cookie_name": "XuanWu-Auth"
     }
   }
 }
@@ -349,7 +349,7 @@ docker-compose exec mysql mysql -u xuanwu -p -e "SELECT 1"
 
 ### Data Encryption
 
-Xuanwu uses **AES-256-GCM** encryption for all sensitive data at rest:
+XuanWu uses **AES-256-GCM** encryption for all sensitive data at rest:
 
 1. **Encryption Key**: Set `XUANWU_ENCRYPTION_KEY` environment variable (base64-encoded 32-byte key)
    ```bash

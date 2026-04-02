@@ -4,7 +4,7 @@
 
 ## Goal
 
-Design a unified channel integration architecture for Xuanwu that supports:
+Design a unified channel integration architecture for XuanWu that supports:
 
 - user-managed channel connections
 - multiple connections per user per channel type
@@ -15,7 +15,7 @@ The first implementation target is Feishu as a chat channel only. Document, wiki
 
 ## Background
 
-Xuanwu currently has:
+XuanWu currently has:
 
 - a core API layer for browser and client interaction under `app/xuanwu/api`
 - a session and memory model already isolated by user
@@ -34,7 +34,7 @@ At the same time, the repo now includes imported OpenClaw channel extensions for
 - `extionsions/slack`
 - `extionsions/whatsapp`
 
-These extensions are useful as reference implementations, but they are not directly compatible with Xuanwu's current architecture.
+These extensions are useful as reference implementations, but they are not directly compatible with XuanWu's current architecture.
 
 ## Scope
 
@@ -43,7 +43,7 @@ These extensions are useful as reference implementations, but they are not direc
 - unified channel connection model for multiple channel types
 - file-based per-user channel configuration
 - runtime management for user-owned channel connections
-- inbound message routing from external channels into Xuanwu conversations
+- inbound message routing from external channels into XuanWu conversations
 - outbound message delivery back to the originating channel connection
 - frontend-facing REST APIs for connection management
 - support for channel-specific webhook or websocket runtimes through per-channel drivers
@@ -54,7 +54,7 @@ These extensions are useful as reference implementations, but they are not direc
 - direct reuse of OpenClaw plugin registration or `plugin-sdk`
 - merging channel webhooks into the existing markdown skill webhook dispatch system
 - full implementation details for every supported channel in this design
-- replacing Xuanwu's current browser/client websocket protocol
+- replacing XuanWu's current browser/client websocket protocol
 
 ## Findings
 
@@ -71,7 +71,7 @@ The imported OpenClaw extensions do not represent one uniform channel model.
 - outbound message and typing support
 - unrelated document/wiki/drive/permission tools
 
-For Xuanwu, only the chat-channel subset is relevant.
+For XuanWu, only the chat-channel subset is relevant.
 
 #### Slack
 
@@ -86,7 +86,7 @@ This means a generic channel architecture cannot assume webhook-only transport.
 
 `extionsions/whatsapp` uses a very different model based on local auth/session state and long-lived runtime listeners. It is not a simple credential + webhook integration.
 
-### Xuanwu API Layer Analysis
+### XuanWu API Layer Analysis
 
 The current `app/xuanwu/api` package divides responsibilities in a way that matters for this design.
 
@@ -105,7 +105,7 @@ The current `app/xuanwu/api` package divides responsibilities in a way that matt
 - `gateway.py`
 - `websocket.py`
 
-These implement Xuanwu's own client protocol, not third-party chat channel transports. Their connection lifecycle ideas are useful, but their protocol and runtime cannot be reused directly for external channels.
+These implement XuanWu's own client protocol, not third-party chat channel transports. Their connection lifecycle ideas are useful, but their protocol and runtime cannot be reused directly for external channels.
 
 #### Keep Separate
 
@@ -119,7 +119,7 @@ This is a markdown-skill dispatch subsystem authenticated by shared secret and t
 2. User-owned channel connections must be isolated from platform-level static config.
 3. Different channel types must share a common outer model but keep channel-specific inner config.
 4. Channel runtimes must be pluggable because transport and auth models differ.
-5. Xuanwu conversation orchestration should remain channel-agnostic.
+5. XuanWu conversation orchestration should remain channel-agnostic.
 
 ## Recommended Architecture
 
@@ -165,7 +165,7 @@ Responsibilities:
 - validate channel-specific config
 - start and stop channel-specific runtimes
 - handle inbound webhook or websocket events
-- convert inbound traffic into Xuanwu message input
+- convert inbound traffic into XuanWu message input
 - send outbound replies, typing indicators, and media when supported
 - expose channel-specific frontend form schema
 
@@ -339,7 +339,7 @@ For an inbound event:
 3. manager loads the matching connection record
 4. matching driver validates the request and parses the event
 5. driver returns a normalized inbound payload
-6. payload is converted to Xuanwu message input
+6. payload is converted to XuanWu message input
 7. request is routed into `RequestOrchestrator`
 8. model output is sent back using the same connection
 
@@ -384,9 +384,9 @@ The new channel hook subsystem should serve:
 
 Some channels use persistent websocket or socket-based transports.
 
-These should not reuse Xuanwu's existing API websocket/gateway runtime directly because:
+These should not reuse XuanWu's existing API websocket/gateway runtime directly because:
 
-- current websocket code serves Xuanwu's own client protocol
+- current websocket code serves XuanWu's own client protocol
 - third-party channel protocols are different
 - auth and reconnect logic differ by platform
 
@@ -481,7 +481,7 @@ The channel layer should attach extra context such as:
 
 ### `gateway.py` and `websocket.py`
 
-These should remain dedicated to Xuanwu browser/client communication.
+These should remain dedicated to XuanWu browser/client communication.
 
 No direct runtime reuse is recommended for external channel transports.
 
@@ -545,7 +545,7 @@ File-based config means encryption-at-rest and redacted API responses are mandat
 
 ## Decision Summary
 
-Xuanwu should not port OpenClaw channel plugins directly.
+XuanWu should not port OpenClaw channel plugins directly.
 
 Instead, it should introduce a unified channel integration subsystem with:
 

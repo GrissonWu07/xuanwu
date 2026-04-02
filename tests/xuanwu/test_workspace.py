@@ -95,7 +95,7 @@ class TestWorkspaceInitializer:
         assert "agent_id: \"main\"" in content
         assert "System Prompt" in content
         assert "Capabilities" in content
-        assert "Xuanwu Enterprise AI Assistant" in content
+        assert "XuanWu Enterprise AI Assistant" in content
 
     def test_default_main_agent_matches_repo_template(self, tmp_path):
         """Test: Default main agent files are copied from repo templates."""

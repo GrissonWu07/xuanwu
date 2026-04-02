@@ -4,7 +4,7 @@
 
 **Goal:** Make all provider skills load as `provider:skill` from `providers_root` and remove the separate webhook skill source configuration.
 
-**Architecture:** Xuanwu will derive a stable provider namespace from each provider directory under `providers_root`, pass that namespace into markdown skill loading, and rely on the resulting qualified names for webhook dispatch. Webhook startup validation will stop depending on `webhook.skill_sources` because provider skills are already in the registry.
+**Architecture:** XuanWu will derive a stable provider namespace from each provider directory under `providers_root`, pass that namespace into markdown skill loading, and rely on the resulting qualified names for webhook dispatch. Webhook startup validation will stop depending on `webhook.skill_sources` because provider skills are already in the registry.
 
 **Tech Stack:** Python, FastAPI, Pydantic, JSON config, pytest
 

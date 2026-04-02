@@ -1,15 +1,15 @@
-# Xuanwu Agent Guide
+# XuanWu Agent Guide
 
 > **DEPRECATED**: This document has been superseded by [Architecture](./ARCHITECTURE.MD) §3 (Directory Structure).
 > Please refer to the canonical architecture document.
 
-This document describes the relationship between Users, Workspaces, Agents, Providers, Skills, and Channels in the Xuanwu enterprise AI agent framework.
+This document describes the relationship between Users, Workspaces, Agents, Providers, Skills, and Channels in the XuanWu enterprise AI agent framework.
 
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Xuanwu System                                 │
+│                              XuanWu System                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌───────────┐ │
@@ -40,7 +40,7 @@ This document describes the relationship between Users, Workspaces, Agents, Prov
 
 ### 1. User
 
-A **User** represents an authenticated entity in the Xuanwu system.
+A **User** represents an authenticated entity in the XuanWu system.
 
 **Key Characteristics:**
 - Identified by a unique `user_id` (UUID)
@@ -58,7 +58,7 @@ A **User** represents an authenticated entity in the Xuanwu system.
 
 ### 2. Workspace
 
-A **Workspace** is the root organizational unit containing all Xuanwu resources.
+A **Workspace** is the root organizational unit containing all XuanWu resources.
 
 **Key Characteristics:**
 - Contains system-wide configuration and resources

@@ -34,8 +34,8 @@ def _create_local_auth_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> t
             "jwt": {
                 "secret_key": "e2e-secret",
                 "issuer": "xuanwu-e2e",
-                "header_name": "Xuanwu-Authenticate",
-                "cookie_name": "Xuanwu-Authenticate",
+                "header_name": "XuanWu-Authenticate",
+                "cookie_name": "XuanWu-Authenticate",
                 "expires_minutes": 60,
             },
             "local": {
@@ -120,7 +120,7 @@ def test_login_then_access_root_and_auth_me(
                 follow_redirects=False,
                 headers={
                     "Accept": "text/html",
-                    "Xuanwu-Authenticate": token,
+                    "XuanWu-Authenticate": token,
                 },
             )
             location = root_resp.headers.get("location", "")
@@ -128,7 +128,7 @@ def test_login_then_access_root_and_auth_me(
 
             me_resp = client.get(
                 "/api/auth/me",
-                headers={"Xuanwu-Authenticate": token},
+                headers={"XuanWu-Authenticate": token},
             )
             assert me_resp.status_code == 200
             assert me_resp.json().get("user_id") == "admin"

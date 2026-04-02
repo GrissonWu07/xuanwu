@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from app.xuanwu.core.config_schema import XuanwuConfig
+from app.xuanwu.core.config_schema import XuanWuConfig
 
 
 def test_hooks_runtime_config_parses_script_handlers() -> None:
-    config = XuanwuConfig.model_validate(
+    config = XuanWuConfig.model_validate(
         {
             "hooks_runtime": {
                 "script_handlers": [
@@ -32,4 +32,3 @@ def test_hooks_runtime_config_parses_script_handlers() -> None:
     assert handler.enabled is True
     assert handler.cwd == "."
     assert handler.priority == 50
-

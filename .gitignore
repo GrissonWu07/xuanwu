@@ -8,8 +8,6 @@ openspec/
 *.pyd
 .xuanwu-test/
 .xuanwu/
-.atlasclaw-test/
-.atlasclaw/
 users/
 workspace/
 .codebuddy/

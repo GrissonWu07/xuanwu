@@ -1,6 +1,6 @@
-# Xuanwu
+# XuanWu
 
-This guide describes how to deploy Xuanwu in your own environment using pre-built Docker images.
+This guide describes how to deploy XuanWu in your own environment using pre-built Docker images.
 
 ## Prerequisites
 
@@ -117,11 +117,11 @@ cp -r src/channels/* ./channels/ 2>/dev/null || true
 rm -rf src
 ```
 
-**Note:** Extensions are optional. Xuanwu will start successfully even without any extensions installed.
+**Note:** Extensions are optional. XuanWu will start successfully even without any extensions installed.
 
 ### 4. Configure LLM Model (Required)
 
-**⚠️ You MUST configure at least one LLM token before starting Xuanwu.**
+**⚠️ You MUST configure at least one LLM token before starting XuanWu.**
 
 The service will fail to start without a valid model configuration. Tokens can be added via:
 - Configuration file (xuanwu.json) - for initial setup
@@ -215,7 +215,7 @@ Set proper permissions:
 chmod 600 /opt/xuanwu/workspace/xuanwu.json
 ```
 
-### 5. Start Xuanwu
+### 5. Start XuanWu
 
 ```bash
 cd /opt/xuanwu
@@ -225,7 +225,7 @@ docker compose up -d
 ### 6. Verify Deployment
 
 ```bash
-curl http://localhost:8000/api/health
+curl http://localhost:9000/api/health
 ```
 
 Expected response:
@@ -233,7 +233,7 @@ Expected response:
 {"status": "healthy", "timestamp": "2026-03-23T10:00:00+00:00"}
 ```
 
-Access the web UI at: `http://your-server-ip:8000`
+Access the web UI at: `http://your-server-ip:9000`
 
 ---
 
@@ -393,7 +393,7 @@ Edit `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "8080:8000"  # Change 8080 to your preferred port
+  - "8080:9000"  # Change 8080 to your preferred port
 ```
 
 ### Permission Denied
@@ -407,4 +407,4 @@ chown -R $(id -u):$(id -g) /opt/xuanwu/data
 
 ## Support
 
-For technical support, contact your Xuanwu representative or refer to the full documentation at [docs link].
+For technical support, contact your XuanWu representative or refer to the full documentation at [docs link].

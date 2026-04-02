@@ -16,7 +16,7 @@
 - Create: `app/atlasclaw/hooks/runtime_models.py`
 - Create: `app/atlasclaw/hooks/runtime_store.py`
 - Modify: `app/atlasclaw/hooks/system.py`
-- Test: `tests/xuanwu/test_hook_runtime_store.py`
+- Test: `tests/atlasclaw/test_hook_runtime_store.py`
 
 - [ ] Step 1: Write failing store tests for user-isolated hook state, pending lifecycle, and decision logging.
 - [ ] Step 2: Run targeted pytest to confirm failure.
@@ -29,7 +29,7 @@
 **Files:**
 - Create: `app/atlasclaw/hooks/sinks.py`
 - Modify: `app/atlasclaw/agent/history_memory.py`
-- Test: `tests/xuanwu/test_hook_sinks.py`
+- Test: `tests/atlasclaw/test_hook_sinks.py`
 
 - [ ] Step 1: Write failing tests for `MemorySink` writing confirmed hook items into `memory_<timestamp>.md` and for `ContextSink` only surfacing confirmed records.
 - [ ] Step 2: Run targeted pytest to confirm failure.
@@ -43,7 +43,7 @@
 - Modify: `app/atlasclaw/agent/runtime_events.py`
 - Modify: `app/atlasclaw/agent/runner.py`
 - Modify: `app/atlasclaw/main.py`
-- Test: `tests/xuanwu/test_hook_runtime_integration.py`
+- Test: `tests/atlasclaw/test_hook_runtime_integration.py`
 
 - [ ] Step 1: Write failing integration tests proving `run.started`, `run.completed`, `run.failed`, `llm.*`, and `tool.*` events are emitted with a proper envelope.
 - [ ] Step 2: Run targeted pytest to confirm failure.
@@ -58,7 +58,7 @@
 - Modify: `app/atlasclaw/api/routes.py`
 - Modify: `app/atlasclaw/api/schemas.py`
 - Modify: `app/atlasclaw/api/deps_context.py`
-- Test: `tests/xuanwu/test_hook_api_routes.py`
+- Test: `tests/atlasclaw/test_hook_api_routes.py`
 
 - [ ] Step 1: Write failing API tests for `GET /api/hooks/{module}/events`, `GET /api/hooks/{module}/pending`, `POST /api/hooks/{module}/pending/{id}/confirm`, and `POST /api/hooks/{module}/pending/{id}/reject`.
 - [ ] Step 2: Run targeted pytest to confirm failure.
@@ -71,7 +71,7 @@
 **Files:**
 - Create: `app/atlasclaw/hooks/builtin_handlers.py`
 - Modify: `app/atlasclaw/hooks/runtime.py`
-- Test: `tests/xuanwu/test_builtin_hook_handlers.py`
+- Test: `tests/atlasclaw/test_builtin_hook_handlers.py`
 
 - [ ] Step 1: Write failing tests for a generic built-in handler that records runtime failures into hook state without embedding skill semantics.
 - [ ] Step 2: Run targeted pytest to confirm failure.
@@ -84,12 +84,11 @@
 - Modify: `docs/architecture.md`
 - Modify: `docs/module-details.md`
 - Modify: `docs/development-spec.md`
-- Modify: `tests/xuanwu/e2e/test_e2e_api.py`
+- Modify: `tests/atlasclaw/e2e/test_e2e_api.py`
 
 - [ ] Step 1: Update canonical docs to describe Hook Runtime, HookStateStore, MemorySink, ContextSink, and generic hook APIs.
 - [ ] Step 2: Expand E2E coverage to hit the new generic hook endpoints and verify at least one runtime-generated hook record is visible through the API.
-- [ ] Step 3: Run backend unit tests: `pytest tests/xuanwu -m "not e2e" -q -p no:cacheprovider`
-- [ ] Step 4: Run E2E tests: `pytest tests/xuanwu -m e2e -q -p no:cacheprovider`
+- [ ] Step 3: Run backend unit tests: `pytest tests/atlasclaw -m "not e2e" -q -p no:cacheprovider`
+- [ ] Step 4: Run E2E tests: `pytest tests/atlasclaw -m e2e -q -p no:cacheprovider`
 - [ ] Step 5: If needed, restart the local service using the project root `.env` and re-run the E2E flow.
 - [ ] Step 6: Perform a final code review pass and summarize any residual risks before completion.
-

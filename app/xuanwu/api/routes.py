@@ -53,7 +53,7 @@ def install_request_validation_logging(app: FastAPI) -> None:
 
 
 def create_router() -> APIRouter:
-    router = APIRouter(prefix="/api", tags=["Xuanwu API"])
+    router = APIRouter(prefix="/api", tags=["XuanWu API"])
     register_session_routes(router)
     register_hook_routes(router)
     register_agent_routes(router)

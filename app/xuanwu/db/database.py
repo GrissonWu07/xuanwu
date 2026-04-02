@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Database connection management for Xuanwu.
+"""Database connection management for XuanWu.
 
 Supports SQLite (open source) and MySQL (enterprise) backends.
 """

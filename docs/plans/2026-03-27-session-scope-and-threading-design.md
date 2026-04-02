@@ -2,7 +2,7 @@
 
 ## Background
 
-Xuanwu currently has three related problems around conversation isolation:
+XuanWu currently has three related problems around conversation isolation:
 
 1. Web chat cannot create a truly new conversation thread. The UI can reset or switch a
    stored `session_key`, but `POST /api/sessions` still returns a stable scope-derived
@@ -144,7 +144,7 @@ Use **Scheme B Enhanced**:
 
 ### Semantics
 
-- `user_id`: the authenticated principal inside Xuanwu
+- `user_id`: the authenticated principal inside XuanWu
 - `channel`: source channel (`web`, `feishu`, `dingtalk`, `wecom`, ...)
 - `account_id`: channel connection/account namespace
 - `chat_type`: `dm`, `group`, `channel`, or `thread`
@@ -159,8 +159,8 @@ Use **Scheme B Enhanced**:
 
 - `channel = "web"`
 - `chat_type = dm`
-- `user_id = authenticated Xuanwu user`
-- `peer_id = authenticated Xuanwu user`
+- `user_id = authenticated XuanWu user`
+- `peer_id = authenticated XuanWu user`
 - New conversation thread: generate a new `thread_id`
 
 ### Feishu

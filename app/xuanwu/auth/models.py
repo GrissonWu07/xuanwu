@@ -74,7 +74,7 @@ class AuthResult:
 class ShadowUser:
     """
     Internal user record that persists the link between an external identity
-    and the Xuanwu runtime. Stored in <workspace>/users.json.
+    and the XuanWu runtime. Stored in <workspace>/users.json.
     """
     user_id: str                    # Internal UUID
     provider: str                   # e.g. "smartcmp", "oidc", "none", "local"

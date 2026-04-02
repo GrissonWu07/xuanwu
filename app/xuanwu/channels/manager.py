@@ -193,11 +193,19 @@ class ChannelManager:
             logger.info(f"[ChannelManager] Processing message: {message.content[:50]}...")
             
             # Get handler for sending reply
-            instance_key = f"{user_id}:{channel_type}:{connection_id}"
-            handler = self._active_connections.get(instance_key)
+            handler = self._get_handler_for_connection(channel_type, connection_id)
             
             if not handler:
-                logger.error(f"[ChannelManager] No handler found for {instance_key}")
+                logger.error(
+                    f"[ChannelManager] No handler found for {user_id}:{channel_type}:{connection_id}"
+                )
+                return
+
+            if self._should_skip_inbound_message(handler, channel_type, message):
+                logger.info(
+                    f"[ChannelManager] Skipping inbound message by channel policy: "
+                    f"{channel_type}/{connection_id}/{message.message_id}"
+                )
                 return
             
             from app.xuanwu.core.deps import SkillDeps
@@ -271,6 +279,28 @@ class ChannelManager:
                 
         except Exception as e:
             logger.error(f"[ChannelManager] Error processing message: {e}", exc_info=True)
+
+    def _should_skip_inbound_message(
+        self,
+        handler: ChannelHandler,
+        channel_type: str,
+        message: InboundMessage,
+    ) -> bool:
+        """Evaluate channel-specific filtering policies before agent dispatch."""
+        if channel_type != "feishu":
+            return False
+        if self._resolve_chat_type(message) != ChatType.GROUP:
+            return False
+
+        config = handler.config if isinstance(getattr(handler, "config", None), dict) else {}
+        require_mention = bool(
+            config.get("require_at_mention_in_group")
+            or config.get("require_mention_in_group")
+        )
+        if not require_mention:
+            return False
+        metadata = message.metadata if isinstance(message.metadata, dict) else {}
+        return not bool(metadata.get("has_mention"))
 
 
     def _resolve_chat_type(self, message: InboundMessage) -> ChatType:
@@ -379,8 +409,31 @@ class ChannelManager:
             Standardized InboundMessage or None
         """
         try:
-            # Get handler instance
-            handler = self._get_handler_for_connection(channel_type, connection_id)
+            owner_user_id = self._find_active_connection_owner(channel_type, connection_id)
+            connection_config: Optional[Dict[str, Any]] = None
+            if not owner_user_id:
+                connection_config = await self._load_connection_runtime_config(
+                    channel_type, connection_id
+                )
+                if not connection_config:
+                    logger.error(
+                        f"No active/valid channel config for connection: "
+                        f"{channel_type}/{connection_id}"
+                    )
+                    return None
+                owner_user_id = str(connection_config.get("user_id") or "").strip()
+                if not owner_user_id:
+                    logger.error(
+                        f"Connection owner user_id missing for: {channel_type}/{connection_id}"
+                    )
+                    return None
+
+            handler = await self._ensure_inbound_handler(
+                channel_type=channel_type,
+                connection_id=connection_id,
+                owner_user_id=owner_user_id,
+                connection_config=connection_config,
+            )
             if not handler:
                 logger.error(f"No handler for connection: {channel_type}/{connection_id}")
                 return None
@@ -390,15 +443,121 @@ class ChannelManager:
             if not inbound:
                 return None
 
-            # TODO: Route to SessionManager
-            # session_manager = get_session_manager()
-            # await session_manager.handle_message(inbound)
+            # For webhook-based channels, route to agent pipeline asynchronously.
+            if self._agent_runner:
+                asyncio.create_task(
+                    self._process_message_async(
+                        owner_user_id,
+                        channel_type,
+                        connection_id,
+                        inbound,
+                    )
+                )
 
             return inbound
 
         except Exception as e:
             logger.error(f"Failed to route inbound message: {e}")
             return None
+
+    async def verify_webhook_request(
+        self,
+        channel_type: str,
+        connection_id: str,
+        request: Any,
+    ) -> bool:
+        """Verify inbound webhook request if the handler supports verification."""
+        owner_user_id = self._find_active_connection_owner(channel_type, connection_id)
+        connection_config: Optional[Dict[str, Any]] = None
+        if not owner_user_id:
+            connection_config = await self._load_connection_runtime_config(channel_type, connection_id)
+            if not connection_config:
+                return False
+            owner_user_id = str(connection_config.get("user_id") or "").strip()
+            if not owner_user_id:
+                return False
+
+        handler = await self._ensure_inbound_handler(
+            channel_type=channel_type,
+            connection_id=connection_id,
+            owner_user_id=owner_user_id,
+            connection_config=connection_config,
+        )
+        if not handler:
+            return False
+
+        verify_func = getattr(handler, "verify_webhook_request", None)
+        if not callable(verify_func):
+            return True
+        result = verify_func(request)
+        if asyncio.iscoroutine(result):
+            result = await result
+        return bool(result)
+
+    def _find_active_connection_owner(self, channel_type: str, connection_id: str) -> Optional[str]:
+        """Resolve owner user_id from active in-memory connection keys."""
+        for key in self._active_connections:
+            parts = key.split(":")
+            if len(parts) != 3:
+                continue
+            user_id, conn_type, conn_id = parts
+            if conn_type == channel_type and conn_id == connection_id:
+                return user_id
+        return None
+
+    async def _load_connection_runtime_config(
+        self,
+        channel_type: str,
+        connection_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Load and validate channel runtime config from database."""
+        from app.xuanwu.db import get_db_manager
+
+        async with get_db_manager().get_session() as session:
+            channel = await ChannelConfigService.get_by_id(session, connection_id)
+            if not channel or channel.type != channel_type:
+                return None
+            config = ChannelConfigService.to_channel_config(channel)
+
+        if not config.get("enabled", False):
+            return None
+        return config
+
+    async def _ensure_inbound_handler(
+        self,
+        *,
+        channel_type: str,
+        connection_id: str,
+        owner_user_id: str,
+        connection_config: Optional[Dict[str, Any]] = None,
+    ) -> Optional[ChannelHandler]:
+        """Ensure a handler instance exists for webhook inbound processing."""
+        handler = self._get_handler_for_connection(channel_type, connection_id)
+        if handler:
+            return handler
+
+        runtime_config = connection_config or await self._load_connection_runtime_config(
+            channel_type, connection_id
+        )
+        if not runtime_config:
+            return None
+
+        if str(runtime_config.get("user_id") or "").strip() != owner_user_id:
+            return None
+
+        handler = ChannelRegistry.create_instance(
+            connection_id,
+            channel_type,
+            runtime_config["config"],
+        )
+        if not handler:
+            return None
+
+        if not await handler.setup(runtime_config["config"]):
+            return None
+        if not await handler.start(None):  # TODO: pass proper context
+            return None
+        return handler
 
     def _get_handler_for_connection(
         self,
@@ -601,3 +760,60 @@ class ChannelManager:
             return status_map.get(status, "disconnected")
         except Exception:
             return "disconnected"
+
+    def list_active_connection_descriptors(self) -> list[dict[str, Any]]:
+        """Return lightweight descriptors for all active connections."""
+        items: list[dict[str, Any]] = []
+        for key, handler in sorted(self._active_connections.items()):
+            parts = key.split(":")
+            if len(parts) != 3:
+                continue
+            user_id, channel_type, connection_id = parts
+            items.append(
+                {
+                    "user_id": user_id,
+                    "channel_type": channel_type,
+                    "connection_id": connection_id,
+                    "status": self.get_connection_runtime_status(connection_id),
+                    "supports_long_connection": bool(getattr(handler, "supports_long_connection", False)),
+                }
+            )
+        return items
+
+    async def probe_connection(
+        self,
+        user_id: str,
+        channel_type: str,
+        connection_id: str,
+    ) -> dict[str, Any]:
+        """Run a narrow health probe for an active connection."""
+        instance_key = f"{user_id}:{channel_type}:{connection_id}"
+        handler = self._active_connections.get(instance_key)
+        if handler is None:
+            return {"healthy": False, "status": "disconnected", "reconnected": False}
+
+        healthy = await handler.health_check()
+        return {
+            "healthy": healthy,
+            "status": self.get_connection_runtime_status(connection_id),
+            "reconnected": False,
+        }
+
+    async def reconnect_connection(
+        self,
+        user_id: str,
+        channel_type: str,
+        connection_id: str,
+    ) -> bool:
+        """Attempt a best-effort reconnect for an active long connection."""
+        instance_key = f"{user_id}:{channel_type}:{connection_id}"
+        handler = self._active_connections.get(instance_key)
+        if handler is None:
+            return False
+        if not getattr(handler, "supports_long_connection", False):
+            return False
+        try:
+            return bool(await handler.reconnect())
+        except Exception:
+            logger.exception("Failed to reconnect channel connection: %s", instance_key)
+            return False

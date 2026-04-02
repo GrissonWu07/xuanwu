@@ -1,5 +1,5 @@
 #!/bin/bash
-# Xuanwu remote deploy helper
+# XuanWu remote deploy helper
 # Usage: ./remote-deploy.sh root@192.168.16.21 /opt/xuanwu
 
 set -e

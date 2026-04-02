@@ -79,7 +79,7 @@ def _build_client(tmp_path: Path, monkeypatch, *, allowed_skills: list[str]) -> 
 
     webhook_config = WebhookConfig(
         enabled=True,
-        header_name="X-Xuanwu-SK",
+        header_name="X-XuanWu-SK",
         systems=[
             WebhookSystemConfig(
                 system_id="smartcmp-preapproval",
@@ -155,7 +155,7 @@ class TestWebhookDispatchAPI:
 
         resp = client.post(
             "/api/webhook/dispatch",
-            headers={"X-Xuanwu-SK": "secret-1"},
+            headers={"X-XuanWu-SK": "secret-1"},
             json={
                 "skill": "smartcmp:preapproval-agent",
                 "args": {"approval_id": "A-10001", "agent_identity": "agent-approver"},
@@ -178,7 +178,7 @@ class TestWebhookDispatchAPI:
 
         resp = client.post(
             "/api/webhook/dispatch",
-            headers={"X-Xuanwu-SK": "bad-secret"},
+            headers={"X-XuanWu-SK": "bad-secret"},
             json={"skill": "smartcmp:preapproval-agent", "args": {}},
         )
 
@@ -193,7 +193,7 @@ class TestWebhookDispatchAPI:
 
         resp = client.post(
             "/api/webhook/dispatch",
-            headers={"X-Xuanwu-SK": "secret-1"},
+            headers={"X-XuanWu-SK": "secret-1"},
             json={"skill": "smartcmp:request", "args": {}},
         )
 
@@ -208,7 +208,7 @@ class TestWebhookDispatchAPI:
 
         resp = client.post(
             "/api/webhook/dispatch",
-            headers={"X-Xuanwu-SK": "secret-1"},
+            headers={"X-XuanWu-SK": "secret-1"},
             json={"skill": "jira_issue_get", "args": {}},
         )
 

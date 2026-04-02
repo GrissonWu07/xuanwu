@@ -5,7 +5,7 @@ services:
     image: registry.cn-shanghai.aliyuncs.com/xuanwu/xuanwu:latest
     container_name: xuanwu
     ports:
-      - "8000:8000"
+      - "9000:9000"
     environment:
       - XUANWU_CONFIG=/app/workspace/xuanwu.json
     volumes:
@@ -19,7 +19,7 @@ services:
       - /opt/xuanwu/extensions/channels:/app/extensions/channels
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

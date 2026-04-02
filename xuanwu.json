@@ -84,8 +84,8 @@
     "provider": "local",
     "cache_ttl_seconds": 300,
     "jwt": {
-      "header_name": "Xuanwu-Authenticate",
-      "cookie_name": "Xuanwu-Authenticate",
+      "header_name": "XuanWu-Authenticate",
+      "cookie_name": "XuanWu-Authenticate",
       "issuer": "xuanwu",
       "secret_key": "${XUANWU_JWT_SECRET}",
       "expires_minutes": 480

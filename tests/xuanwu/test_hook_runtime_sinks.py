@@ -92,4 +92,3 @@ async def test_context_sink_includes_explicit_injections(tmp_path):
     assert len(confirmed) == 1
     assert confirmed[0].summary == "Recent preference"
     assert confirmed[0].payload["body"] == "Prefer concise summaries"
-

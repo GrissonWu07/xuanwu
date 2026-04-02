@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Channel management for Xuanwu."""
+"""Channel management for XuanWu."""
 
 from __future__ import annotations
 

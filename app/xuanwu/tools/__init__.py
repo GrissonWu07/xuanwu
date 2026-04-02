@@ -1,4 +1,4 @@
-"""Built-in tool package for Xuanwu.
+"""Built-in tool package for XuanWu.
 
 Tools are exposed through `RunContext[SkillDeps]` and share a common result
 format. This package includes:

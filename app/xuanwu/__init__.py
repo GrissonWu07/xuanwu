@@ -1,7 +1,7 @@
 """
-Xuanwu enterprise assistant framework.
+XuanWu enterprise assistant framework.
 
-This package provides the Xuanwu runtime built on top of PydanticAI and the
+This package provides the XuanWu runtime built on top of PydanticAI and the
 project's supporting infrastructure.
 
 Main modules:

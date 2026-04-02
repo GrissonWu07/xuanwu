@@ -133,4 +133,3 @@ async def test_runner_failure_emits_failed_events_and_pending(tmp_path):
     assert HookEventType.RUN_COMPLETED not in event_types
     pending = await hook_state_store.list_pending(RUNTIME_AUDIT_MODULE, "alice")
     assert len(pending) >= 1
-

@@ -154,4 +154,3 @@ def test_hook_routes_confirm_and_reject_pending(tmp_path):
     pending_after = client.get(f"/api/hooks/{quote(RUNTIME_AUDIT_MODULE, safe='')}/pending")
     assert pending_after.status_code == 200
     assert pending_after.json() == []
-

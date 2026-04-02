@@ -1,2 +1,2 @@
 # -*- coding: utf-8 -*-
-"""Xuanwu 测试包"""
+"""XuanWu 测试包"""

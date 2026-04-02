@@ -60,7 +60,7 @@ class SessionTitleGenerator:
         if not cleaned:
             return ""
 
-        first_sentence = re.split(r"[。！？?.]\s*", cleaned, maxsplit=1)[0]
+        first_sentence = re.split(r"[。！？!?\.]\s*", cleaned, maxsplit=1)[0]
         first_sentence = self._clean(first_sentence)
         if not first_sentence:
             return ""

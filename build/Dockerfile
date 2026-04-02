@@ -1,4 +1,4 @@
-# Xuanwu OpenSource Edition
+# XuanWu OpenSource Edition
 # Lightweight build with SQLite for single-node deployment
 
 FROM python:3.11-slim-bookworm
@@ -35,11 +35,11 @@ RUN mkdir -p /app/workspace /app/data /app/workspace/logs \
     /app/extensions/providers /app/extensions/skills /app/extensions/channels
 
 # Expose port
-EXPOSE 8000
+EXPOSE 9000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+    CMD curl -f http://localhost:9000/api/health || exit 1
 
 # Start server (SQLite auto-creates on startup)
-CMD ["uvicorn", "app.xuanwu.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.xuanwu.main:app", "--host", "0.0.0.0", "--port", "9000"]

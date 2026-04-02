@@ -9,7 +9,7 @@ jest.mock('../../app/frontend/scripts/auth.js', () => ({
 describe('header.js', () => {
   beforeEach(() => {
     document.body.innerHTML = '<div id="header"></div>'
-    document.title = 'Xuanwu'
+    document.title = 'XuanWu'
     jest.resetModules()
   })
 

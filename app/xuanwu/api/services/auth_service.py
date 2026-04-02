@@ -7,13 +7,13 @@ from typing import Any, Optional
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
-from ...auth.jwt_token import issue_xuanwu_token, verify_xuanwu_token
+from ...auth.jwt_token import issue_atlas_token, verify_atlas_token
 from ...auth.models import AuthenticationError
 from ...session.context import ChatType as SessionChatType
 from ...session.context import SessionKey, SessionScope
 from ..deps_context import (
     APIContext,
-    extract_xuanwu_token_from_request,
+    extract_atlas_token_from_request,
     get_api_context,
     is_admin_from_roles,
     resolve_workspace_path,
@@ -114,7 +114,7 @@ async def perform_local_login(request: Request, body: LocalLoginRequest) -> Resp
     session.extra["roles"] = roles
     session.extra["is_admin"] = is_admin
 
-    xuanwu_token = issue_xuanwu_token(
+    atlas_token = issue_atlas_token(
         subject=auth_result.subject,
         is_admin=is_admin,
         roles=roles,
@@ -140,7 +140,7 @@ async def perform_local_login(request: Request, body: LocalLoginRequest) -> Resp
                 "key": session_key_str,
                 "created_at": session.created_at.isoformat(),
             },
-            "token": xuanwu_token,
+            "token": atlas_token,
             "token_type": "Bearer",
             "header_name": jwt_cfg.header_name,
         },
@@ -155,7 +155,7 @@ async def perform_local_login(request: Request, body: LocalLoginRequest) -> Resp
     )
     response.set_cookie(
         key=jwt_cfg.cookie_name,
-        value=xuanwu_token,
+        value=atlas_token,
         path="/",
         httponly=True,
         secure=secure_cookie,
@@ -262,7 +262,7 @@ async def complete_sso_login(
     session.extra["roles"] = roles
     session.extra["is_admin"] = is_admin
 
-    xuanwu_token = issue_xuanwu_token(
+    atlas_token = issue_atlas_token(
         subject=user_id,
         is_admin=is_admin,
         roles=roles,
@@ -282,7 +282,7 @@ async def complete_sso_login(
     )
     response.set_cookie(
         key=jwt_cfg.cookie_name,
-        value=xuanwu_token,
+        value=atlas_token,
         httponly=True,
         secure=secure_cookie,
         samesite="lax",
@@ -328,7 +328,7 @@ async def get_current_user_payload(request: Request) -> dict[str, Any]:
         }
 
     jwt_cfg = auth_config.jwt.expanded()
-    token = extract_xuanwu_token_from_request(
+    token = extract_atlas_token_from_request(
         request,
         jwt_cfg.header_name,
         jwt_cfg.cookie_name,
@@ -340,7 +340,7 @@ async def get_current_user_payload(request: Request) -> dict[str, Any]:
         )
 
     try:
-        jwt_payload = verify_xuanwu_token(
+        jwt_payload = verify_atlas_token(
             token=token,
             secret_key=jwt_cfg.secret_key,
             issuer=jwt_cfg.issuer,
@@ -351,7 +351,7 @@ async def get_current_user_payload(request: Request) -> dict[str, Any]:
             detail=f"Invalid token: {exc}",
         ) from exc
 
-    session_key = request.cookies.get("xuanwu_session") or request.cookies.get("atlasclaw_session")
+    session_key = request.cookies.get("xuanwu_session")
     if not session_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -394,7 +394,7 @@ async def get_current_user_payload(request: Request) -> dict[str, Any]:
 async def logout_user(request: Request, redirect: bool = True) -> Response:
     from ...auth.config import AuthConfig
 
-    session_key = request.cookies.get("xuanwu_session") or request.cookies.get("atlasclaw_session")
+    session_key = request.cookies.get("xuanwu_session")
     if session_key:
         ctx = get_api_context()
         await ctx.session_manager.delete_session(session_key)
@@ -420,11 +420,9 @@ async def logout_user(request: Request, redirect: bool = True) -> Response:
         response = JSONResponse(content={"status": "logged_out"})
 
     response.delete_cookie("xuanwu_session")
-    response.delete_cookie("atlasclaw_session")
     if auth_config and getattr(auth_config, "jwt", None):
         response.delete_cookie(auth_config.jwt.expanded().cookie_name)
-    response.delete_cookie("Xuanwu-Authenticate")
-    response.delete_cookie("AtlasClaw-Authenticate")
+    response.delete_cookie("XuanWu-Authenticate")
     response.delete_cookie("CloudChef-Authenticate")
     response.delete_cookie("oidc_id_token")
     response.delete_cookie("sso_state")

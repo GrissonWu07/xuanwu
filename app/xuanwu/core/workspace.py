@@ -1,7 +1,7 @@
 """Workspace initialization and management.
 
 This module provides workspace directory structure initialization
-and management for Xuanwu.
+and management for XuanWu.
 """
 
 from __future__ import annotations

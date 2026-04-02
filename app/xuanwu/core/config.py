@@ -14,7 +14,7 @@ from typing import Optional, Any
 from pydantic import ValidationError
 from dotenv import load_dotenv
 
-from app.xuanwu.core.config_schema import XuanwuConfig
+from app.xuanwu.core.config_schema import XuanWuConfig
 
 
 class ConfigManager:
@@ -48,13 +48,10 @@ Configuration manager
     DEFAULT_CONFIG_PATHS = [
         "xuanwu.json",
         "xuanwu.yaml",
-        "atlasclaw.json",
-        "atlasclaw.yaml",
         "~/.xuanwu/config.json",
-        "~/.atlasclaw/config.json",
     ]
-
-    ENV_PREFIXES = ("ATLASCLAW_", "XUANWU_")
+    
+    ENV_PREFIX = "XUANWU_"
     
     def __init__(self, config_path: Optional[str] = None):
         """
@@ -65,18 +62,14 @@ initializeConfiguration manager
             config_path:configurationfile path(optional)
         
 """
-        self._config_path = (
-            config_path
-            or os.environ.get("XUANWU_CONFIG")
-            or os.environ.get("ATLASCLAW_CONFIG")
-        )
-        self._config: XuanwuConfig = XuanwuConfig()
+        self._config_path = config_path or os.environ.get("XUANWU_CONFIG")
+        self._config: XuanWuConfig = XuanWuConfig()
         self._runtime_overrides: dict[str, Any] = {}
         self._loaded = False
         self._resolved_config_path: Optional[Path] = None
     
     @property
-    def config(self) -> XuanwuConfig:
+    def config(self) -> XuanWuConfig:
         """get configuration"""
         if not self._loaded:
             self.load()
@@ -89,7 +82,7 @@ initializeConfiguration manager
             self.load()
         return self._resolved_config_path
     
-    def load(self) -> XuanwuConfig:
+    def load(self) -> XuanWuConfig:
         """
         Load configuration.
         
@@ -125,11 +118,11 @@ initializeConfiguration manager
         
         # 7. Create configuration object
         try:
-            self._config = XuanwuConfig(**config_dict)
+            self._config = XuanWuConfig(**config_dict)
         except ValidationError as e:
             # Config validation failed, use defaults
             print(f"[ConfigManager] Config validation failed, using defaults: {e}")
-            self._config = XuanwuConfig()
+            self._config = XuanWuConfig()
         
         self._loaded = True
         return self._config
@@ -173,16 +166,14 @@ initializeConfiguration manager
         if self._config_path:
             workspace_path = str(Path(self._config_path).parent)
         
-        for workspace_config_path in (
-            Path(workspace_path) / "xuanwu.json",
-            Path(workspace_path) / "atlasclaw.json",
-        ):
-            if workspace_config_path.exists():
-                try:
-                    with open(workspace_config_path, "r", encoding="utf-8") as f:
-                        return json.load(f)
-                except Exception as e:
-                    print(f"[ConfigManager] Failed to read workspace config {workspace_config_path}: {e}")
+        # Try to load workspace xuanwu.json
+        workspace_config_path = Path(workspace_path) / "xuanwu.json"
+        if workspace_config_path.exists():
+            try:
+                with open(workspace_config_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"[ConfigManager] Failed to read workspace config {workspace_config_path}: {e}")
         
         return None
     
@@ -190,8 +181,7 @@ initializeConfiguration manager
         """Load user-specific configuration.
         
         Loads user config from users/<user_id>/user_setting.json.
-        Backward compatible: if user_setting.json doesn't exist, try the
-        legacy AtlasClaw-era filename.
+        Backward compatible: if user_setting.json doesn't exist, try xuanwu.json.
         
         Args:
             user_id: User identifier
@@ -211,8 +201,8 @@ initializeConfiguration manager
             except Exception as e:
                 print(f"[ConfigManager] Failed to read user config {user_config_path}: {e}")
         
-        # Backward compatible: try loading the legacy AtlasClaw filename.
-        legacy_config_path = user_dir / "atlasclaw.json"
+        # Backward compatible: try loading old xuanwu.json
+        legacy_config_path = user_dir / "xuanwu.json"
         if legacy_config_path.exists():
             try:
                 with open(legacy_config_path, "r", encoding="utf-8") as f:
@@ -228,7 +218,7 @@ initializeConfiguration manager
         
         return {}
     
-    def reload(self) -> XuanwuConfig:
+    def reload(self) -> XuanWuConfig:
         """configuration"""
         self._loaded = False
         return self.load()
@@ -318,16 +308,20 @@ fromenvironment variable configuration
         
 """
         config: dict[str, Any] = {}
-
-        for prefix in self.ENV_PREFIXES:
-            for key, value in os.environ.items():
-                if not key.startswith(prefix):
-                    continue
-
-                config_key = key[len(prefix):].lower()
-                parts = config_key.split("__")
-                parsed_value = self._parse_env_value(value)
-                self._set_nested(config, parts, parsed_value)
+        
+        for key, value in os.environ.items():
+            if not key.startswith(self.ENV_PREFIX):
+                continue
+            
+            # prefix configuration
+            config_key = key[len(self.ENV_PREFIX):].lower()
+            parts = config_key.split("__")
+            
+            # parse type
+            parsed_value = self._parse_env_value(value)
+            
+            # to configurationdictionary
+            self._set_nested(config, parts, parsed_value)
         
         return config
     
@@ -380,13 +374,16 @@ _config_manager: Optional[ConfigManager] = None
 def get_config_manager() -> ConfigManager:
     """get Configuration managerinstance"""
     global _config_manager
+    config_path = os.environ.get("XUANWU_CONFIG") or os.environ.get("XUANWU_CONFIG")
     if _config_manager is None:
-        config_path = os.environ.get("XUANWU_CONFIG") or os.environ.get("ATLASCLAW_CONFIG")
+        _config_manager = ConfigManager(config_path=config_path)
+    elif (_config_manager._config_path or None) != (config_path or None):
+        # Rebuild the singleton when tests or runtime update env-based config path.
         _config_manager = ConfigManager(config_path=config_path)
     return _config_manager
 
 
-def get_config() -> XuanwuConfig:
+def get_config() -> XuanWuConfig:
     """get configuration"""
     return get_config_manager().config
 

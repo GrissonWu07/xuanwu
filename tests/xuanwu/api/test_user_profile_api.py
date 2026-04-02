@@ -123,8 +123,8 @@ def _get_auth_config() -> AuthConfig:
         jwt={
             "secret_key": "test-secret-key-for-profile-tests",
             "issuer": "xuanwu-test",
-            "header_name": "Xuanwu-Authenticate",
-            "cookie_name": "Xuanwu-Authenticate",
+            "header_name": "XuanWu-Authenticate",
+            "cookie_name": "XuanWu-Authenticate",
             "expires_minutes": 60,
         },
     )
@@ -151,7 +151,7 @@ class TestUserProfileAPI:
 
         resp = client.get(
             "/api/users/me/profile",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -176,7 +176,7 @@ class TestUserProfileAPI:
                 "email": "updated@test.com",
                 "avatar_url": "https://example.com/avatar.png",
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -188,7 +188,7 @@ class TestUserProfileAPI:
         # Verify changes persist
         get_resp = client.get(
             "/api/users/me/profile",
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
         assert get_resp.json()["display_name"] == "Updated Name"
 
@@ -204,7 +204,7 @@ class TestUserProfileAPI:
         resp = client.put(
             "/api/users/me/profile",
             json={"display_name": "Only Name Updated"},
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -224,7 +224,7 @@ class TestUserProfileAPI:
         resp = client.put(
             "/api/users/me/profile",
             json={"email": "other@test.com"},  # Email belongs to otheruser
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 409
@@ -241,7 +241,7 @@ class TestUserProfileAPI:
         resp = client.put(
             "/api/users/me/profile",
             json={},
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 400
@@ -261,7 +261,7 @@ class TestUserProfileAPI:
                 "current_password": "testpass123",
                 "new_password": "newpassword456",
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 200
@@ -285,7 +285,7 @@ class TestUserProfileAPI:
                 "current_password": "wrongpassword",
                 "new_password": "newpassword456",
             },
-            headers={"Xuanwu-Authenticate": token},
+            headers={"XuanWu-Authenticate": token},
         )
 
         assert resp.status_code == 400
@@ -328,7 +328,7 @@ class TestUserProfileAPI:
 
         resp = client.get(
             "/api/users/me/profile",
-            headers={"Xuanwu-Authenticate": "invalid-token-xyz"},
+            headers={"XuanWu-Authenticate": "invalid-token-xyz"},
         )
 
         assert resp.status_code == 401

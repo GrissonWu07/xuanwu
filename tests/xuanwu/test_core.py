@@ -15,7 +15,7 @@ import pytest
 from app.xuanwu.core.deps import SkillDeps
 from app.xuanwu.core.config import ConfigManager
 from app.xuanwu.core.config_schema import (
-    XuanwuConfig,
+    XuanWuConfig,
     ModelConfig,
     AgentDefaultsConfig,
     ResetConfig,
@@ -71,7 +71,7 @@ class TestConfigSchema:
     
     def test_default_config(self):
         """测试默认配置"""
-        config = XuanwuConfig()
+        config = XuanWuConfig()
         
         assert config.log_level is not None
         assert config.model is not None
@@ -128,7 +128,7 @@ class TestConfigManager:
         config = manager.config
         
         assert config is not None
-        assert isinstance(config, XuanwuConfig)
+        assert isinstance(config, XuanWuConfig)
         
     def test_set_config(self, temp_config_dir):
         """测试设置配置覆盖"""

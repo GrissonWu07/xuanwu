@@ -1,6 +1,6 @@
-# Xuanwu Architecture
+# XuanWu Architecture
 
-> **Canonical architecture reference for the Xuanwu enterprise agent framework.**
+> **Canonical architecture reference for the XuanWu enterprise agent framework.**
 > All future development and feature changes MUST consult this document.
 >
 > Related documents:
@@ -28,7 +28,7 @@
 
 ## 1. Design Philosophy
 
-Xuanwu is built on five core design principles that govern all architectural decisions:
+XuanWu is built on five core design principles that govern all architectural decisions:
 
 ### 1.1 Thin Core, Rich Providers
 
@@ -36,7 +36,7 @@ The framework core handles routing, lifecycle, and coordination. All domain-spec
 
 ### 1.2 Permission Inheritance (No RBAC Bypass)
 
-Xuanwu never creates its own authorization layer. Every operation inherits the authenticated user's permissions from the connected enterprise system. If a user cannot perform an action in the upstream system, the agent cannot perform it on their behalf. This is enforced through `SkillDeps.user_info` propagation to every skill and tool invocation.
+XuanWu never creates its own authorization layer. Every operation inherits the authenticated user's permissions from the connected enterprise system. If a user cannot perform an action in the upstream system, the agent cannot perform it on their behalf. This is enforced through `SkillDeps.user_info` propagation to every skill and tool invocation.
 
 ### 1.3 Async-First
 
@@ -44,7 +44,7 @@ All I/O-bound operations are async. The framework uses `asyncio.Event` for cance
 
 ### 1.4 Hybrid Storage Model
 
-Xuanwu uses a hybrid storage approach combining file-system and relational database:
+XuanWu uses a hybrid storage approach combining file-system and relational database:
 
 **File-System Storage** (lightweight/embedded mode):
 - **Sessions**: JSONL (one JSON object per line, append-only)
@@ -156,9 +156,9 @@ A single agent instance serves multiple access channels simultaneously (REST API
 
 ### Session Scope Model
 
-Xuanwu uses a canonical `SessionKey` to separate session ownership from conversation scope:
+XuanWu uses a canonical `SessionKey` to separate session ownership from conversation scope:
 
-- `user_id`: the Xuanwu user that owns the persisted session bucket
+- `user_id`: the XuanWu user that owns the persisted session bucket
 - `channel` + `account_id`: the ingress surface and concrete channel connection
 - `chat_type` + `peer_id`: the external conversation scope
 - `thread_id`: an optional independent thread inside the same scope
@@ -648,7 +648,7 @@ Quota enforcement: `TenantManager.check_quota()` validates `max_sessions`, `max_
 
 ## 9. Extension Points
 
-Xuanwu provides four main extension mechanisms:
+XuanWu provides four main extension mechanisms:
 
 ### 9.1 Provider Extension
 

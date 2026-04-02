@@ -2,11 +2,11 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build a unified user-owned channel integration framework in Xuanwu, then deliver the first production path for Feishu chat ingress and egress on top of it.
+**Goal:** Build a unified user-owned channel integration framework in XuanWu, then deliver the first production path for Feishu chat ingress and egress on top of it.
 
-**Architecture:** Introduce a shared channel integration store, runtime manager, driver registry, and hook routing layer. Keep channel-specific protocol logic inside drivers, and bridge inbound events into the existing Xuanwu orchestration path without modifying provider semantics.
+**Architecture:** Introduce a shared channel integration store, runtime manager, driver registry, and hook routing layer. Keep channel-specific protocol logic inside drivers, and bridge inbound events into the existing XuanWu orchestration path without modifying provider semantics.
 
-**Tech Stack:** FastAPI, Pydantic, file-based JSON storage, existing Xuanwu session/auth/orchestration modules, Feishu SDK or equivalent HTTP client
+**Tech Stack:** FastAPI, Pydantic, file-based JSON storage, existing XuanWu session/auth/orchestration modules, Feishu SDK or equivalent HTTP client
 
 ---
 
@@ -344,7 +344,7 @@ git -C xuanwu commit -m "feat: add feishu driver config validation"
 Cover:
 
 - webhook verification handling
-- event payload to normalized Xuanwu inbound message conversion
+- event payload to normalized XuanWu inbound message conversion
 - duplicate message tolerance
 
 **Step 2: Run test to verify it fails**
@@ -354,7 +354,7 @@ Expected: FAIL because Feishu inbound bridge is incomplete
 
 **Step 3: Write minimal implementation**
 
-Use the imported OpenClaw Feishu extension as reference only. Reimplement only the minimal chat ingress path needed for Xuanwu.
+Use the imported OpenClaw Feishu extension as reference only. Reimplement only the minimal chat ingress path needed for XuanWu.
 
 **Step 4: Run test to verify it passes**
 

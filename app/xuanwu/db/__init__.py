@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Database layer for Xuanwu."""
+"""Database layer for XuanWu."""
 
 from app.xuanwu.db.database import (
     DatabaseManager,

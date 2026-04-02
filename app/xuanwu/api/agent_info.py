@@ -74,7 +74,7 @@ async def get_agent_info() -> AgentInfoResponse:
         welcome_parts = []
         
         # Add name
-        name = soul_data.get("name", identity_data.get("name", "Xuanwu"))
+        name = soul_data.get("name", identity_data.get("name", "XuanWu"))
         welcome_parts.append(f"Hello! I'm {name}.")
         
         # Add description

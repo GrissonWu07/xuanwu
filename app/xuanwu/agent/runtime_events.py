@@ -1,4 +1,4 @@
-"""Runtime event and hook dispatch helpers for AgentRunner."""
+﻿"""Runtime event and hook dispatch helpers for AgentRunner."""
 
 from __future__ import annotations
 

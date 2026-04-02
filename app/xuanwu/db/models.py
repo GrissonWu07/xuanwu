@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""SQLAlchemy ORM models for Xuanwu database entities.
+"""SQLAlchemy ORM models for XuanWu database entities.
 
 Models:
 - AgentModel: Agent configuration storage

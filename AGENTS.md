@@ -1,6 +1,6 @@
-# AGENTS.md - Xuanwu Coding Guidelines
+# AGENTS.md - XuanWu Coding Guidelines
 
-Coding guidelines for AI assistants working on the Xuanwu enterprise agent framework.
+Coding guidelines for AI assistants working on the XuanWu enterprise agent framework.
 
 ## Build / Test / Lint Commands
 
@@ -8,7 +8,7 @@ Coding guidelines for AI assistants working on the Xuanwu enterprise agent frame
 
 ```bash
 # Run the service
-uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 9000
 
 # Run all tests
 pytest tests/xuanwu -q
@@ -156,7 +156,7 @@ If a task already exists under `docs/project/tasks/`, read its related
 ## Project Structure
 
 ```
-Xuanwu-Core/
+XuanWu-Core/
 ├── app/xuanwu/          # Main application code
 │   ├── agent/            # Agent engine, streaming, routing
 │   ├── api/              # REST, WebSocket, SSE endpoints

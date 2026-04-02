@@ -1,6 +1,6 @@
-# Xuanwu Development Specification
+# XuanWu Development Specification
 
-> **Canonical development standards for the Xuanwu enterprise agent framework.**
+> **Canonical development standards for the XuanWu enterprise agent framework.**
 > All future development and feature changes MUST follow these specifications.
 >
 > This document consolidates content previously in `CODE_STRUCTURE.md`, `CODING_STANDARDS.md`,
@@ -76,7 +76,7 @@ Each function, class, and module should have one clear purpose.
 ### 2.1 Directory Tree
 
 ```
-Xuanwu-Core/
+XuanWu-Core/
 ├── app/
 │   ├── frontend/                    # Web UI (DeepChat-based)
 │   │   ├── index.html              # Main entry point
@@ -618,11 +618,11 @@ The `HookSystem` provides cross-cutting concern injection at 17+ lifecycle phase
 Define custom exceptions for your module:
 
 ```python
-class XuanwuError(Exception):
-    """Base exception for all Xuanwu errors."""
+class XuanWuError(Exception):
+    """Base exception for all XuanWu errors."""
     pass
 
-class SessionError(XuanwuError):
+class SessionError(XuanWuError):
     """Exception raised for session-related errors."""
     pass
 
@@ -929,7 +929,7 @@ async def test_fetch_data_with_mock():
 # Use fixtures for shared resources
 @pytest.fixture
 def mock_config():
-    return XuanwuConfig(log_level=LogLevel.DEBUG)
+    return XuanWuConfig(log_level=LogLevel.DEBUG)
 
 # Use parametrize for data-driven tests
 @pytest.mark.parametrize("scope,expected", [
@@ -1190,10 +1190,10 @@ class MyFeatureConfig(BaseModel):
     max_retries: int = Field(default=3, ge=1, description="Maximum retry attempts")
 ```
 
-2. Add the field to `XuanwuConfig`:
+2. Add the field to `XuanWuConfig`:
 
 ```python
-class XuanwuConfig(BaseModel):
+class XuanWuConfig(BaseModel):
     ...
     my_feature: MyFeatureConfig = Field(default_factory=MyFeatureConfig)
 ```
@@ -1261,6 +1261,29 @@ repos:
       - id: mypy
 ```
 
+### 11.3 Heartbeat Runtime Standards
+
+When implementing or extending heartbeat functionality:
+
+- keep heartbeat scheduling separate from Hook Runtime scheduling
+- use `HeartbeatRuntime` typed jobs instead of ad-hoc background loops
+- emit standard heartbeat events before any notification delivery
+- persist per-user heartbeat state under `workspace/users/<user_id>/heartbeat/`
+- treat channel heartbeat as self-healing first, alerting second
+- preserve OpenClaw-aligned semantics for agent heartbeat where applicable:
+  - `HEARTBEAT.md`
+  - `every`
+  - `activeHours`
+  - `isolatedSession`
+  - `HEARTBEAT_OK`
+
+Required verification for heartbeat changes:
+
+- unit tests for config/models/store/targets/runtime
+- integration coverage for hook event bridging
+- end-to-end coverage for runtime execution and persisted state
+- full application E2E pass with a live server before claiming completion
+
 ---
 
 ## 12. Deployment & Operations
@@ -1285,7 +1308,7 @@ repos:
 ```bash
 # Clone and enter project
 git clone <repository-url>
-cd Xuanwu-Core
+cd XuanWu-Core
 
 # Create and activate virtual environment
 python -m venv venv
@@ -1381,7 +1404,7 @@ $env:NO_PROXY="*"
 $env:XUANWU_CONFIG="xuanwu.json"
 
 # Run development server
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --reload
 ```
 
 **Production mode**:
@@ -1390,17 +1413,17 @@ export NO_PROXY="*"
 export XUANWU_CONFIG="xuanwu.json"
 
 # Run with multiple workers
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --workers 4
 ```
 
 **Using Gunicorn**:
 ```bash
-gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:9000
 ```
 
 **Verify deployment**:
 ```bash
-curl http://localhost:8000/api/health
+curl http://localhost:9000/api/health
 # Expected: {"status": "healthy"}
 ```
 
@@ -1430,14 +1453,14 @@ COPY alembic.ini .
 RUN mkdir -p /app/data
 
 # Expose port
-EXPOSE 8000
+EXPOSE 9000
 
 # Health check (note: /api/health is the correct endpoint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+    CMD curl -f http://localhost:9000/api/health || exit 1
 
 # Run migrations and start server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000"]
 ```
 
 ```bash
@@ -1447,7 +1470,7 @@ docker build -f docker/Dockerfile -t xuanwu-core .
 # Run with config
 docker run -d \
   --name xuanwu \
-  -p 8000:8000 \
+  -p 9000:9000 \
   -v $(pwd)/xuanwu.json:/app/xuanwu.json:ro \
   -e XUANWU_ENCRYPTION_KEY=your-key \
   xuanwu-core
@@ -1465,7 +1488,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "8000:8000"
+      - "9000:9000"
     environment:
       - XUANWU_ENCRYPTION_KEY=${XUANWU_ENCRYPTION_KEY:-change-me-in-production}
     volumes:
@@ -1473,7 +1496,7 @@ services:
       - xuanwu-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1493,7 +1516,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "8000:8000"
+      - "9000:9000"
     environment:
       - XUANWU_ENCRYPTION_KEY=${XUANWU_ENCRYPTION_KEY:-change-me-in-production}
       - DB_HOST=mysql
@@ -1509,7 +1532,7 @@ services:
       - xuanwu-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1555,7 +1578,7 @@ export MYSQL_PASSWORD=your-password
 alembic upgrade head
 
 # Start service
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000
 ```
 
 **Migration Files**:
@@ -1572,7 +1595,7 @@ server {
     server_name your-domain.com;
 
     location / {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://localhost:9000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -1585,7 +1608,7 @@ server {
 
     # SSE endpoint — disable buffering
     location /api/agent/runs/ {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://localhost:9000;
         proxy_http_version 1.1;
         proxy_set_header Connection '';
         proxy_buffering off;
@@ -1604,18 +1627,18 @@ sudo certbot --nginx -d your-domain.com
 ```ini
 # /etc/systemd/system/xuanwu.service
 [Unit]
-Description=Xuanwu Core Service
+Description=XuanWu Core Service
 After=network.target
 
 [Service]
 Type=simple
 User=xuanwu
 Group=xuanwu
-WorkingDirectory=/opt/xuanwu/Xuanwu-Core
+WorkingDirectory=/opt/xuanwu/XuanWu-Core
 Environment="PATH=/opt/xuanwu/venv/bin"
 Environment="NO_PROXY=*"
-Environment="XUANWU_CONFIG=/opt/xuanwu/Xuanwu-Core/xuanwu.json"
-ExecStart=/opt/xuanwu/venv/bin/uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --workers 4
+Environment="XUANWU_CONFIG=/opt/xuanwu/XuanWu-Core/xuanwu.json"
+ExecStart=/opt/xuanwu/venv/bin/uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --workers 4
 Restart=always
 RestartSec=5
 
@@ -1685,7 +1708,7 @@ sudo systemctl start xuanwu
 
 **Port already in use**:
 ```bash
-lsof -i :8000       # Find process
+lsof -i :9000       # Find process
 kill -9 <PID>        # Kill it
 # Or use a different port:
 uvicorn app.xuanwu.main:app --port 8080
@@ -1706,15 +1729,15 @@ curl -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
 **Debug mode**:
 ```bash
 export LOG_LEVEL=DEBUG
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --reload
 ```
 
 ### 12.9 Monitoring & Backup
 
 **Health check**:
 ```bash
-curl http://localhost:8000/api/health
-curl http://localhost:8000/api/health?detailed=true
+curl http://localhost:9000/api/health
+curl http://localhost:9000/api/health?detailed=true
 ```
 
 **Backup**:

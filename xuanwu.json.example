@@ -1,5 +1,5 @@
 {
-  "_comment": "Example Xuanwu configuration. This file stays valid JSON by using _comment fields instead of // comments.",
+  "_comment": "Example XuanWu configuration. This file stays valid JSON by using _comment fields instead of // comments.",
   "workspace": {
     "_comment": "Workspace configuration for runtime data and user sessions",
     "path": "./.xuanwu"
@@ -77,7 +77,7 @@
   "webhook": {
     "_comment": "Inbound webhook dispatch for provider-qualified markdown skills already loaded from providers_root.",
     "enabled": true,
-    "header_name": "X-Xuanwu-SK",
+    "header_name": "X-XuanWu-SK",
     "systems": [
       {
         "_comment": "One external caller. sk_env points to the shared secret variable, typically defined in .env.",

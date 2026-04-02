@@ -1,4 +1,4 @@
-# Xuanwu User Guide
+# XuanWu User Guide
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@
 
 ## 1. Overview
 
-**Xuanwu** is an enterprise-grade AI Agent framework that lets employees interact with multiple enterprise systems through a single conversational AI interface. Instead of switching between separate consoles, dashboards, and portals, users can use natural language to trigger workflows, query operational data, and complete cross-system tasks from one entry point.
+**XuanWu** is an enterprise-grade AI Agent framework that lets employees interact with multiple enterprise systems through a single conversational AI interface. Instead of switching between separate consoles, dashboards, and portals, users can use natural language to trigger workflows, query operational data, and complete cross-system tasks from one entry point.
 
 ### Core Design Principles
 
@@ -64,8 +64,8 @@
 ### Install Dependencies
 
 ```bash
-# Navigate to Xuanwu-Core
-cd Xuanwu-Core
+# Navigate to XuanWu-Core
+cd XuanWu-Core
 
 # Create a virtual environment (recommended)
 python3 -m venv .venv
@@ -126,12 +126,12 @@ ANTHROPIC_API_KEY=your-api-key
 **Step 3 — Start the service**
 
 ```bash
-uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 9000
 ```
 
 **Step 4 — Open the Web UI**
 
-Navigate to `http://127.0.0.1:8000` in your browser.
+Navigate to `http://127.0.0.1:9000` in your browser.
 
 ---
 
@@ -222,7 +222,7 @@ Configure inbound webhooks for provider-qualified skills already loaded from `pr
   "providers_root": "../xuanwu-providers/providers",
   "webhook": {
     "enabled": true,
-    "header_name": "X-Xuanwu-SK",
+    "header_name": "X-XuanWu-SK",
     "systems": [
       {
         "system_id": "smartcmp-preapproval",
@@ -247,29 +247,29 @@ Configured under the `auth` section. See [Section 9](#9-authentication) for full
 ### Development Mode (with hot reload)
 
 ```bash
-uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.xuanwu.main:app --reload --host 0.0.0.0 --port 9000
 ```
 
 ### Production Mode
 
 ```bash
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --workers 4
 ```
 
 ### Using Gunicorn
 
 ```bash
-gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:9000
 ```
 
 ### Successful Startup Log
 
 ```
-[Xuanwu] Registered 12 built-in tools
-[Xuanwu] Agent created with model: openai:deepseek-chat
-[Xuanwu] Application started successfully
-[Xuanwu] Session storage: ~/.xuanwu/agents
-[Xuanwu] Skills loaded: 5 executable, 3 markdown
+[XuanWu] Registered 12 built-in tools
+[XuanWu] Agent created with model: openai:deepseek-chat
+[XuanWu] Application started successfully
+[XuanWu] Session storage: ~/.xuanwu/agents
+[XuanWu] Skills loaded: 5 executable, 3 markdown
 ```
 
 ### Environment Variables for Deployment
@@ -289,7 +289,7 @@ gunicorn app.xuanwu.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.
 ### Access URL
 
 ```
-http://127.0.0.1:8000
+http://127.0.0.1:9000
 ```
 
 ### Features
@@ -305,9 +305,9 @@ The frontend reads its API base URL from `/config.json` at startup. For cross-or
 
 ```bash
 # Tells the frontend where to send API requests
-UNICLAW_API_BASE_URL=http://192.168.88.4:8000
+UNICLAW_API_BASE_URL=http://192.168.88.4:9000
 # Allow the embedding platform's origin
-CORS_ORIGINS=http://192.168.88.4:8000,http://172.16.0.93
+CORS_ORIGINS=http://192.168.88.4:9000,http://172.16.0.93
 ```
 
 ### Frontend Development
@@ -329,8 +329,8 @@ npm run build:dev  # development bundle with sourcemaps
 
 After the service starts, interactive API docs are available at:
 
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
+- Swagger UI: `http://127.0.0.1:9000/docs`
+- ReDoc: `http://127.0.0.1:9000/redoc`
 
 All API paths are prefixed with `/api`.
 
@@ -338,9 +338,9 @@ All API paths are prefixed with `/api`.
 
 Sessions track conversation context. A `session_key` is returned on creation and used for all subsequent calls.
 
-Xuanwu now treats session ownership and chat threading as separate concerns:
+XuanWu now treats session ownership and chat threading as separate concerns:
 
-- `user_id` in the canonical `SessionKey` identifies the Xuanwu user that owns the session bucket
+- `user_id` in the canonical `SessionKey` identifies the XuanWu user that owns the session bucket
 - `channel`, `account_id`, `chat_type`, and `peer_id` identify the external conversation scope
 - `thread_id` identifies an independent chat thread inside the same scope
 - Session metadata and transcripts are stored under `workspace/users/<user_id>/sessions/`
@@ -436,7 +436,7 @@ Content-Type: application/json
 
 {
   "skill_name": "web_search",
-  "args": { "query": "Xuanwu documentation" }
+  "args": { "query": "XuanWu documentation" }
 }
 ```
 
@@ -579,7 +579,7 @@ providers/<provider-name>/
 - Project / component / issue-type metadata
 - Configuration: see [Section 3.2](#32-service-providers-configuration)
 
-**SmartCMP Provider** (external, `Xuanwu-Providers/SmartCMP-Provider/`):
+**SmartCMP Provider** (external, `XuanWu-Providers/SmartCMP-Provider/`):
 - Approval workflow management
 - Skills: list pending approvals, approve / reject / retreat / cancel / batch process
 
@@ -714,7 +714,7 @@ Supported IdPs: Keycloak, Okta, Azure AD, Auth0, Dex, or any OIDC-compliant IdP.
 | `issuer` | Yes | — | IdP issuer URL; OIDC Discovery performed automatically |
 | `client_id` | Yes | — | OAuth2 client ID registered in the IdP |
 | `client_secret` | Yes | — | OAuth2 client secret |
-| `redirect_base_url` | Yes | — | Public base URL of this Xuanwu instance, used to build the callback URL |
+| `redirect_base_url` | Yes | — | Public base URL of this XuanWu instance, used to build the callback URL |
 | `scopes` | No | `["openid","profile","email"]` | OAuth2 scopes |
 | `session_secret` | No | auto-generated | HMAC-SHA256 signing key; if omitted, sessions are invalidated on restart |
 | `session_ttl_seconds` | No | `28800` (8 h) | Session validity |
@@ -734,7 +734,7 @@ Supported IdPs: Keycloak, Okta, Azure AD, Auth0, Dex, or any OIDC-compliant IdP.
 #### Login Flow
 
 ```
-Browser                    Xuanwu                  IdP
+Browser                    XuanWu                  IdP
    │  GET /auth/login         │                         │
    │─────────────────────────>│                         │
    │<─ 302 + state cookie ────│                         │
@@ -950,7 +950,7 @@ npm test
 
 ```bash
 export LOG_LEVEL=DEBUG
-uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.xuanwu.main:app --host 0.0.0.0 --port 9000 --reload
 ```
 
 ### 11.5 Adding a Custom Skill
@@ -966,10 +966,10 @@ See [SKILL-GUIDE.MD](./SKILL-GUIDE.MD) for the complete guide.
 
 ```bash
 # List all registered skills
-curl http://localhost:8000/api/skills
+curl http://localhost:9000/api/skills
 
 # Test a skill directly
-curl -X POST http://localhost:8000/api/skills/execute \
+curl -X POST http://localhost:9000/api/skills/execute \
   -H "Content-Type: application/json" \
   -d '{"skill_name": "my-skill", "args": {}}'
 ```
@@ -981,7 +981,7 @@ curl -X POST http://localhost:8000/api/skills/execute \
 ### Repository Layout
 
 ```
-Xuanwu-Core/
+XuanWu-Core/
 ├── app/
 │   ├── frontend/               # Web UI (DeepChat + custom JS)
 │   │   ├── index.html

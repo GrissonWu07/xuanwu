@@ -8,6 +8,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 
 from ..auth.models import ANONYMOUS_USER, UserInfo
+from .attachment_links import resolve_attachment_link_secret, resolve_attachment_link_ttl_seconds
 from .deps_context import APIContext, get_api_context
 from .schemas import AgentRunRequest, AgentRunResponse, AgentStatusResponse
 from .services.run_service import (
@@ -31,6 +32,8 @@ def register_agent_routes(router: APIRouter) -> None:
         run_id = str(uuid.uuid4())
         user_info: UserInfo = getattr(request_obj.state, "user_info", ANONYMOUS_USER)
         request_cookies = dict(request_obj.cookies)
+        attachment_link_secret = resolve_attachment_link_secret(request_obj)
+        attachment_link_ttl_seconds = resolve_attachment_link_ttl_seconds(request_obj)
         provider_config = build_provider_config(ctx)
         safe_message = normalize_user_message(request.message)
         init_run(ctx, run_id, request.session_key, safe_message, request.timeout_seconds)
@@ -46,6 +49,8 @@ def register_agent_routes(router: APIRouter) -> None:
             request_cookies,
             provider_config,
             request.context,
+            attachment_link_secret,
+            attachment_link_ttl_seconds,
         )
 
         return AgentRunResponse(

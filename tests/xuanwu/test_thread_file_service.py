@@ -122,3 +122,32 @@ class TestThreadFileService:
         assert [item.name for item in artifacts] == ["notes.md", "report.txt"]
         assert artifacts[0].relative_path == "1711612455/workspace/notes.md"
         assert artifacts[1].relative_path == "1711612455/outputs/report.txt"
+
+    @pytest.mark.asyncio
+    async def test_finalize_runtime_artifacts_honors_presented_paths_when_provided(self, tmp_path):
+        service = ThreadFileService(
+            workspace_path=str(tmp_path),
+            user_id="u-alice",
+            thread_id="thread-123",
+        )
+
+        runtime_batch = await service.create_runtime_batch(batch_id="1711612555")
+        before = await service.snapshot_runtime_files(runtime_batch.batch_id)
+
+        generated_workspace = runtime_batch.workspace_dir / "scratch.tmp"
+        generated_workspace.parent.mkdir(parents=True, exist_ok=True)
+        generated_workspace.write_text("temp", encoding="utf-8")
+
+        generated_output = runtime_batch.outputs_dir / "final-report.pdf"
+        generated_output.parent.mkdir(parents=True, exist_ok=True)
+        generated_output.write_text("%PDF-1.7", encoding="utf-8")
+
+        presented = [f"{runtime_batch.batch_id}/outputs/final-report.pdf"]
+        artifacts = await service.finalize_runtime_artifacts(
+            runtime_batch.batch_id,
+            before,
+            presented_relative_paths=presented,
+        )
+
+        assert [item.name for item in artifacts] == ["final-report.pdf"]
+        assert artifacts[0].relative_path == "1711612555/outputs/final-report.pdf"

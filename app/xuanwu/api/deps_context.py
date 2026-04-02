@@ -20,6 +20,7 @@ from ..skills.registry import SkillRegistry
 from ..hooks.runtime import HookRuntime
 from ..hooks.runtime_sinks import ContextSink, MemorySink
 from ..hooks.runtime_store import HookStateStore
+from ..heartbeat.runtime import HeartbeatRuntime
 from .sse import SSEManager
 from .webhook_dispatch import WebhookDispatchManager
 
@@ -35,6 +36,7 @@ class APIContext:
     memory_sink: Optional[MemorySink] = None
     context_sink: Optional[ContextSink] = None
     hook_runtime: Optional[HookRuntime] = None
+    heartbeat_runtime: Optional[HeartbeatRuntime] = None
     sse_manager: Optional[SSEManager] = None
     agent_runner: Optional[Any] = None
     agent_runners: dict[str, Any] | None = None
@@ -82,16 +84,12 @@ def get_api_context() -> APIContext:
     return _api_context
 
 
-def extract_xuanwu_token_from_request(request: Request, header_name: str, cookie_name: str) -> str:
+def extract_atlas_token_from_request(request: Request, header_name: str, cookie_name: str) -> str:
     token = request.headers.get(header_name, "").strip()
     if token:
         return token
 
-    token = request.headers.get("Xuanwu-Authenticate", "").strip()
-    if token:
-        return token
-
-    token = request.headers.get("AtlasClaw-Authenticate", "").strip()
+    token = request.headers.get("XuanWu-Authenticate", "").strip()
     if token:
         return token
 
@@ -103,11 +101,7 @@ def extract_xuanwu_token_from_request(request: Request, header_name: str, cookie
     if token:
         return token
 
-    token = request.cookies.get("Xuanwu-Authenticate", "").strip()
-    if token:
-        return token
-
-    token = request.cookies.get("AtlasClaw-Authenticate", "").strip()
+    token = request.cookies.get("XuanWu-Authenticate", "").strip()
     if token:
         return token
 

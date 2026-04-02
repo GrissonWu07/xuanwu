@@ -19,11 +19,11 @@ class SSOPlaceholderProvider(AuthProvider):
     This provider is used when config.provider is set to an SSO type.
     It allows the middleware to:
       1. Know the correct provider_name for redirect behavior
-      2. Continue using Xuanwu JWT tokens for session management
+      2. Continue using XuanWu JWT tokens for session management
     
     The actual SSO authentication flow is handled by:
       - /api/auth/login -> begin_sso_login() -> external IdP
-      - /api/auth/callback -> complete_sso_login() -> issue Xuanwu JWT
+      - /api/auth/callback -> complete_sso_login() -> issue XuanWu JWT
     
     This provider's authenticate() always fails because SSO users don't
     present credentials directly - they go through the OAuth2 flow.
@@ -125,7 +125,7 @@ def get_jwt_validator(
     """Get OIDC JWT validator for EXTERNAL API authentication.
     
     Use case: External systems calling our API with JWT tokens.
-    This is NOT for logging in users to Xuanwu, but for validating
+    This is NOT for logging in users to XuanWu, but for validating
     tokens presented by API clients.
     
     Works without configuration if:

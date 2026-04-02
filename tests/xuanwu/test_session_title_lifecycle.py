@@ -11,7 +11,7 @@ from app.xuanwu.session.manager import SessionManager
 def test_session_title_generator_builds_draft_title():
     generator = SessionTitleGenerator(max_length=12)
 
-    title = generator.build_draft_title("  查询待办审批流程的状态 ")
+    title = generator.build_draft_title("  查询待办审批流程的状态  ")
 
     assert title == "查询待办审批流程的状态"
 
@@ -21,10 +21,10 @@ def test_session_title_generator_uses_assistant_hint_for_generic_opening():
 
     title = generator.build_final_title(
         first_user_message="hello",
-        first_assistant_message="关于 Xuanwu 会话恢复机制的说明：已支持切换恢复历史。",
+        first_assistant_message="关于 AtlasClaw 会话恢复机制的说明：已支持切换恢复历史。",
     )
 
-    assert title.startswith("关于 Xuanwu")
+    assert title.startswith("关于 AtlasClaw")
 
 
 @pytest.mark.asyncio
