@@ -14,7 +14,7 @@ let currentSessionKey = null
 let sessionsCache = []
 let searchQuery = ''
 let pageContainer = null
-let currentAgentName = 'AtlasClaw'
+let currentAgentName = 'XuanWu'
 let attachmentsCache = { uploads: [], artifacts: [] }
 
 export async function mount(container) {
@@ -254,7 +254,7 @@ function upsertSession(nextSession) {
 function buildDraftTitle(messageText) {
   const cleaned = String(messageText || '').replace(/\s+/g, ' ').trim().replace(/[,.!?，。！？；：]+$/g, '')
   if (!cleaned) return 'New Chat'
-  return cleaned.length > 24 ? `${cleaned.slice(0, 23).trim()}…` : cleaned
+  return cleaned.length > 24 ? `${cleaned.slice(0, 23).trim()}...` : cleaned
 }
 
 function bindDialogEvents(container) {
@@ -308,6 +308,7 @@ function renderAttachmentStrip() {
       <span class="attachment-strip-label">Attachments</span>
       <div class="attachment-strip-items">${uploadItems || '<span class="attachment-strip-empty">None</span>'}</div>
     </div>
+    <span class="attachment-strip-divider" aria-hidden="true"></span>
     <div class="attachment-strip-group">
       <span class="attachment-strip-label">Outputs</span>
       <div class="attachment-strip-items">${artifactItems || '<span class="attachment-strip-empty">None</span>'}</div>
