@@ -107,3 +107,32 @@ def verify_xuanwu_token(*, token: str, secret_key: str, issuer: str) -> dict[str
         raise AuthenticationError("JWT login_time is missing")
 
     return payload
+
+
+def issue_atlas_token(
+    *,
+    subject: str,
+    is_admin: bool,
+    roles: list[str],
+    auth_type: str,
+    secret_key: str,
+    expires_minutes: int,
+    issuer: str,
+    login_time: Optional[str] = None,
+) -> str:
+    """Backward-compatible alias for legacy Atlas naming."""
+    return issue_xuanwu_token(
+        subject=subject,
+        is_admin=is_admin,
+        roles=roles,
+        auth_type=auth_type,
+        secret_key=secret_key,
+        expires_minutes=expires_minutes,
+        issuer=issuer,
+        login_time=login_time,
+    )
+
+
+def verify_atlas_token(*, token: str, secret_key: str, issuer: str) -> dict[str, Any]:
+    """Backward-compatible alias for legacy Atlas naming."""
+    return verify_xuanwu_token(token=token, secret_key=secret_key, issuer=issuer)
