@@ -7,8 +7,8 @@ from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.atlasclaw.heartbeat.models import HeartbeatTargetType
-from app.atlasclaw.tools.web.provider_models import SearchProviderConfig
+from app.xuanwu.heartbeat.models import HeartbeatTargetType
+from app.xuanwu.tools.web.provider_models import SearchProviderConfig
 
 # Auth config is imported lazily to avoid circular imports at module load time.
 # AuthConfig is referenced only in XuanWuConfig.auth field annotation.

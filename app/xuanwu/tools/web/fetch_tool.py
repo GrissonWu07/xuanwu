@@ -19,8 +19,8 @@ from typing import Optional, TYPE_CHECKING
 from urllib.parse import urljoin, urlsplit
 
 
-from app.atlasclaw.tools.base import ToolResult
-from app.atlasclaw.tools.web.text_codec import decode_http_text
+from app.xuanwu.tools.base import ToolResult
+from app.xuanwu.tools.web.text_codec import decode_http_text
 
 if TYPE_CHECKING:
     from pydantic_ai import RunContext

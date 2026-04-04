@@ -48,7 +48,7 @@ def mount_frontend(app: FastAPI, frontend_dir: Path) -> None:
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     try:
-        from app.atlasclaw.core.config import get_config
+        from app.xuanwu.core.config import get_config
 
         workspace_public_dir = Path(get_config().workspace.path).resolve() / "public"
         workspace_public_dir.mkdir(parents=True, exist_ok=True)

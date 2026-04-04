@@ -1,15 +1,15 @@
-﻿"""Runtime event and hook dispatch helpers for AgentRunner."""
+"""Runtime event and hook dispatch helpers for AgentRunner."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
-from app.atlasclaw.agent.tool_gate_models import CapabilityMatchResult, ToolEnforcementOutcome, ToolGateDecision
-from app.atlasclaw.agent.stream import StreamEvent
-from app.atlasclaw.hooks.runtime import HookRuntime
-from app.atlasclaw.hooks.runtime_models import HookEventType
-from app.atlasclaw.session.context import SessionKey
+from app.xuanwu.agent.tool_gate_models import CapabilityMatchResult, ToolEnforcementOutcome, ToolGateDecision
+from app.xuanwu.agent.stream import StreamEvent
+from app.xuanwu.hooks.runtime import HookRuntime
+from app.xuanwu.hooks.runtime_models import HookEventType
+from app.xuanwu.session.context import SessionKey
 
 
 @dataclass

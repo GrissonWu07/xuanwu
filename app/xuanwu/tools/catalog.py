@@ -23,7 +23,10 @@ GROUP_TOOLS: dict[str, list[str]] = {
         "export_pptx",
         "export_pdf",
     ],
-    GROUP_RUNTIME: [],
+    GROUP_RUNTIME: [
+        "xuanwu_runtime_status",
+        "xuanwu_runtime_call",
+    ],
     GROUP_WEB: ["web_search", "web_fetch", "openmeteo_weather"],
     GROUP_MEMORY: ["memory_search", "memory_get"],
     GROUP_SESSIONS: [

@@ -116,7 +116,7 @@ _TOOL_REGISTRY: dict[str, tuple[ToolMetadata, str, str]] = {
             description="Get current and forecast weather via Open-Meteo APIs",
             group="web",
         ),
-        "app.atlasclaw.tools.web.openmeteo_weather_tool",
+        "app.xuanwu.tools.web.openmeteo_weather_tool",
         "openmeteo_weather_tool",
     ),
     # Provider tools

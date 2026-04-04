@@ -24,6 +24,7 @@ class SSEEventType(Enum):
     LIFECYCLE = "lifecycle"
     ASSISTANT = "assistant"
     TOOL = "tool"
+    ARTIFACT = "artifact"
     COMPACTION = "compaction"
     ERROR = "error"
     HEARTBEAT = "heartbeat"
@@ -525,6 +526,28 @@ tool
         return self.push_event(run_id, SSEEvent(
             event_type=SSEEventType.RUNTIME,
             data=data,
+        ))
+
+    def push_artifact(
+        self,
+        run_id: str,
+        *,
+        artifact_id: str,
+        name: str,
+        relative_path: str,
+        download_url: str,
+        expires_at: str,
+    ) -> int:
+        """Push a runtime artifact event with signed download metadata."""
+        return self.push_event(run_id, SSEEvent(
+            event_type=SSEEventType.ARTIFACT,
+            data={
+                "id": artifact_id,
+                "name": name,
+                "relative_path": relative_path,
+                "download_url": download_url,
+                "expires_at": expires_at,
+            },
         ))
         
     def get_active_streams(self) -> list[str]:

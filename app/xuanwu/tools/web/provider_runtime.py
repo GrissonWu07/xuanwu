@@ -350,6 +350,7 @@ class SearchExecutionRuntime:
 
                 if provider_bundles:
                     merged_provider, merged_results = _merge_provider_results(
+                        query=attempt.query,
                         provider_candidates=provider_candidates,
                         provider_bundles=provider_bundles,
                         limit=limit,
@@ -424,11 +425,12 @@ def _sanitize_search_result(result: NormalizedSearchResult) -> NormalizedSearchR
 
 def _merge_provider_results(
     *,
+    query: str,
     provider_candidates: list[str],
     provider_bundles: list[tuple[str, list[NormalizedSearchResult], str, list[dict[str, str]], bool]],
     limit: int,
 ) -> tuple[str, list[NormalizedSearchResult]]:
-    """Pick first non-empty provider by configured order; no relevance scoring."""
+    """Pick provider results by relevance score and fall back to configured order."""
     bundles_by_provider: dict[str, list[NormalizedSearchResult]] = {}
     for provider_key, results, _summary, _citations, _from_grounding in provider_bundles:
         if provider_key not in bundles_by_provider:
@@ -440,10 +442,36 @@ def _merge_provider_results(
                 result.model_copy(update={"provider": provider_key})
             )
 
-    for provider_key in provider_candidates:
-        candidates = bundles_by_provider.get(provider_key, [])
-        if candidates:
-            return provider_key, candidates[:limit]
+    query_terms = _extract_query_terms(query)
+    order_index = {provider_key: index for index, provider_key in enumerate(provider_candidates)}
+    ranked_providers: list[tuple[float, int, str]] = []
+    for provider_key, candidates in bundles_by_provider.items():
+        if not candidates:
+            continue
+        if not query_terms:
+            ranked_providers.append((0.0, -order_index.get(provider_key, 999), provider_key))
+            continue
+
+        scores = [
+            _score_result_relevance(query=query, query_terms=query_terms, result=item)
+            for item in candidates
+        ]
+        top_score = max(scores) if scores else 0.0
+        avg_score = (sum(scores) / len(scores)) if scores else 0.0
+        positive_ratio = (
+            sum(1 for item in scores if item > 0) / len(scores)
+            if scores
+            else 0.0
+        )
+        provider_score = top_score * 0.7 + avg_score * 0.3 + positive_ratio * 0.6
+        ranked_providers.append(
+            (provider_score, -order_index.get(provider_key, 999), provider_key)
+        )
+
+    if ranked_providers:
+        ranked_providers.sort(reverse=True)
+        winning_provider = ranked_providers[0][2]
+        return winning_provider, bundles_by_provider.get(winning_provider, [])[:limit]
 
     if provider_bundles:
         provider_key, results, _summary, _citations, _from_grounding = provider_bundles[0]

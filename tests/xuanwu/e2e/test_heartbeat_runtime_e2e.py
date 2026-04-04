@@ -30,9 +30,9 @@ def _create_heartbeat_e2e_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "workspace": {
             "path": str((tmp_path / ".xuanwu-e2e").resolve()),
         },
-        "providers_root": "./app/atlasclaw/providers",
-        "skills_root": "./app/atlasclaw/skills",
-        "channels_root": "./app/atlasclaw/channels",
+        "providers_root": "./app/xuanwu/providers",
+        "skills_root": "./app/xuanwu/skills",
+        "channels_root": "./app/xuanwu/channels",
         "database": {
             "type": "sqlite",
             "sqlite": {

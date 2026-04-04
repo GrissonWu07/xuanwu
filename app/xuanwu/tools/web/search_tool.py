@@ -10,9 +10,9 @@ from __future__ import annotations
 import inspect
 from typing import Optional, TYPE_CHECKING
 
-from app.atlasclaw.core.config import get_config
-from app.atlasclaw.tools.base import ToolResult
-from app.atlasclaw.tools.web.provider_runtime import SearchExecutionRuntime
+from app.xuanwu.core.config import get_config
+from app.xuanwu.tools.base import ToolResult
+from app.xuanwu.tools.web.provider_runtime import SearchExecutionRuntime
 
 if TYPE_CHECKING:
     from pydantic_ai import RunContext
