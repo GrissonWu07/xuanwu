@@ -4,6 +4,7 @@
  */
 
 import { buildApiUrl } from './config.js';
+import { getCurrentLocale } from './i18n.js';
 
 /**
  * List all sessions for the current user
@@ -215,7 +216,11 @@ export async function startAgentRun(sessionKey, message) {
         credentials: 'include',
         body: JSON.stringify({
             session_key: sessionKey,
-            message: message
+            message: message,
+            context: {
+                ui_locale: getCurrentLocale(),
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+            }
         })
     });
     

@@ -1,113 +1,129 @@
 # -*- coding: utf-8 -*-
-
 from __future__ import annotations
 
-from app.xuanwu.agent.runner_prompt_context import (
-    build_system_prompt,
-    collect_attachment_runtime,
-)
-from app.xuanwu.auth.models import UserInfo
-from app.xuanwu.core.deps import SkillDeps
+from types import SimpleNamespace
+
+from pydantic_ai import Agent
+
+from app.xuanwu.agent.runner_prompt_context import collect_tools_snapshot
 
 
-class _PromptBuilderWithRuntime:
-    def __init__(self) -> None:
-        self.last_kwargs = None
-
-    def build(
-        self,
-        session=None,
-        skills=None,
-        tools=None,
-        md_skills=None,
-        target_md_skill=None,
-        user_info=None,
-        provider_contexts=None,
-        attachment_context=None,
-        attachment_runtime=None,
-    ) -> str:
-        self.last_kwargs = {
-            "session": session,
-            "skills": skills,
-            "tools": tools,
-            "md_skills": md_skills,
-            "target_md_skill": target_md_skill,
-            "user_info": user_info,
-            "provider_contexts": provider_contexts,
-            "attachment_context": attachment_context,
-            "attachment_runtime": attachment_runtime,
-        }
-        return "ok"
+def test_collect_tools_snapshot_prefers_deps_extra_snapshot() -> None:
+    deps = SimpleNamespace(extra={"tools_snapshot": [{"name": "web_search", "description": "search web"}]})
+    snapshot = collect_tools_snapshot(agent=object(), deps=deps)
+    assert snapshot == [{"name": "web_search", "description": "search web"}]
 
 
-class _PromptBuilderWithoutRuntime:
-    def __init__(self) -> None:
-        self.last_kwargs = None
+def test_collect_tools_snapshot_reads_pydantic_ai_toolsets() -> None:
+    agent = Agent("test")
 
-    def build(
-        self,
-        session=None,
-        skills=None,
-        tools=None,
-        md_skills=None,
-        target_md_skill=None,
-        user_info=None,
-        provider_contexts=None,
-        attachment_context=None,
-    ) -> str:
-        self.last_kwargs = {
-            "session": session,
-            "skills": skills,
-            "tools": tools,
-            "md_skills": md_skills,
-            "target_md_skill": target_md_skill,
-            "user_info": user_info,
-            "provider_contexts": provider_contexts,
-            "attachment_context": attachment_context,
-        }
-        return "ok"
+    @agent.tool_plain
+    def web_search(query: str) -> str:
+        """Search the web by query."""
+        return query
+
+    deps = SimpleNamespace(extra={"tools_snapshot": []})
+    snapshot = collect_tools_snapshot(agent=agent, deps=deps)
+    assert snapshot
+    assert any(tool["name"] == "web_search" for tool in snapshot)
 
 
-def _build_deps() -> SkillDeps:
-    return SkillDeps(
-        user_info=UserInfo(user_id="alice"),
+def test_collect_tools_snapshot_infers_provider_capability_from_skills_snapshot() -> None:
+    agent = SimpleNamespace(
+        tools=[
+            {
+                "name": "jira_search",
+                "description": "Search Jira issues",
+            }
+        ]
+    )
+    deps = SimpleNamespace(
         extra={
-            "attachment_context": {
-                "uploads": [],
-                "artifacts": [],
-            },
-            "attachment_batch_id": "1711612555",
-            "attachment_root": "/tmp/attachments/thread-1/1711612555",
-            "attachment_uploads_dir": "/tmp/attachments/thread-1/1711612555/uploads",
-            "attachment_workspace_dir": "/tmp/attachments/thread-1/1711612555/workspace",
-            "attachment_outputs_dir": "/tmp/attachments/thread-1/1711612555/outputs",
-        },
+            "tools_snapshot": [],
+            "skills_snapshot": [
+                {
+                    "name": "jira_search",
+                    "description": "Search Jira issues",
+                    "category": "provider",
+                    "provider_type": "jira",
+                }
+            ],
+            "md_skills_snapshot": [],
+        }
+    )
+    snapshot = collect_tools_snapshot(agent=agent, deps=deps)
+    assert snapshot == [
+        {
+            "name": "jira_search",
+            "description": "Search Jira issues",
+            "provider_type": "jira",
+            "category": "provider",
+            "capability_class": "provider:jira",
+        }
+    ]
+
+
+def test_collect_tools_snapshot_infers_md_skill_capability() -> None:
+    agent = SimpleNamespace(
+        tools=[
+            {
+                "name": "summarize_skill_run",
+                "description": "Run summarize skill",
+            }
+        ]
+    )
+    deps = SimpleNamespace(
+        extra={
+            "tools_snapshot": [],
+            "skills_snapshot": [],
+            "md_skills_snapshot": [
+                {
+                    "name": "summarize",
+                    "provider": "",
+                    "metadata": {
+                        "tool_name": "summarize_skill_run",
+                        "category": "skill",
+                    },
+                }
+            ],
+        }
+    )
+    snapshot = collect_tools_snapshot(agent=agent, deps=deps)
+    assert snapshot == [
+        {
+            "name": "summarize_skill_run",
+            "description": "Run summarize skill",
+            "category": "skill",
+            "capability_class": "skill",
+        }
+    ]
+
+
+def test_collect_tools_snapshot_falls_back_to_skills_snapshot_when_agent_has_no_tools() -> None:
+    agent = SimpleNamespace(tools=[])
+    deps = SimpleNamespace(
+        extra={
+            "tools_snapshot": [],
+            "skills_snapshot": [
+                {
+                    "name": "web_search",
+                    "description": "Web search",
+                    "category": "builtin:web",
+                },
+                {
+                    "name": "openmeteo_weather",
+                    "description": "Weather lookup",
+                    "category": "builtin:web",
+                },
+            ],
+            "md_skills_snapshot": [],
+        }
     )
 
-
-def test_collect_attachment_runtime_returns_expected_fields():
-    deps = _build_deps()
-    runtime = collect_attachment_runtime(deps)
-    assert runtime is not None
-    assert runtime["attachment_batch_id"] == "1711612555"
-    assert runtime["attachment_outputs_dir"].endswith("/outputs")
-
-
-def test_build_system_prompt_injects_attachment_runtime_when_supported():
-    prompt_builder = _PromptBuilderWithRuntime()
-    deps = _build_deps()
-    result = build_system_prompt(prompt_builder, session=object(), deps=deps, agent=None)
-
-    assert result == "ok"
-    assert prompt_builder.last_kwargs is not None
-    assert prompt_builder.last_kwargs["attachment_runtime"]["attachment_batch_id"] == "1711612555"
-
-
-def test_build_system_prompt_keeps_backward_compat_for_builders_without_runtime():
-    prompt_builder = _PromptBuilderWithoutRuntime()
-    deps = _build_deps()
-    result = build_system_prompt(prompt_builder, session=object(), deps=deps, agent=None)
-
-    assert result == "ok"
-    assert prompt_builder.last_kwargs is not None
-    assert "attachment_runtime" not in prompt_builder.last_kwargs
+    snapshot = collect_tools_snapshot(agent=agent, deps=deps)
+    assert any(tool["name"] == "web_search" for tool in snapshot)
+    assert any(tool["name"] == "openmeteo_weather" for tool in snapshot)
+    assert any(
+        tool["name"] == "web_search" and tool.get("capability_class") == "web_search"
+        for tool in snapshot
+    )

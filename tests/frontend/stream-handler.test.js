@@ -68,6 +68,7 @@ describe('stream-handler.js', () => {
             expect(EventTypes.ARTIFACT).toBe('artifact');
             expect(EventTypes.ERROR).toBe('error');
             expect(EventTypes.HEARTBEAT).toBe('heartbeat');
+            expect(EventTypes.RUNTIME).toBe('runtime');
         });
     });
 
@@ -157,24 +158,20 @@ describe('stream-handler.js', () => {
             expect(onToolEnd).toHaveBeenCalledWith({ tool_name: 'search', result: 'done' });
         });
 
-        test('should call onArtifact callback on artifact event', async () => {
+        test('should call onRuntime callback on runtime event', async () => {
             const { createStreamHandler } = await import('../../app/frontend/scripts/stream-handler.js');
 
-            const onArtifact = jest.fn();
-            const handler = createStreamHandler('run-123', { onArtifact });
+            const onRuntime = jest.fn();
+            const handler = createStreamHandler('run-123', { onRuntime });
             handler.start();
 
             const es = MockEventSource.instances[0];
-            es.simulateEvent('artifact', {
-                artifact_id: 'artifact-1',
-                name: 'report.md',
-                download_url: '/api/download/report.md'
-            });
+            es.simulateEvent('runtime', { state: 'retrying', message: 'Retrying now', attempt: 1 });
 
-            expect(onArtifact).toHaveBeenCalledWith({
-                artifact_id: 'artifact-1',
-                name: 'report.md',
-                download_url: '/api/download/report.md'
+            expect(onRuntime).toHaveBeenCalledWith({
+                state: 'retrying',
+                message: 'Retrying now',
+                metadata: { state: 'retrying', message: 'Retrying now', attempt: 1 }
             });
         });
 

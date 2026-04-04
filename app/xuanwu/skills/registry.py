@@ -193,6 +193,8 @@ class SkillRegistry:
                 "description": meta.description,
                 "category": meta.category,
                 "location": meta.location,
+                "provider_type": meta.provider_type,
+                "instance_required": meta.instance_required,
             }
             for meta, _ in self._skills.values()
         ]
@@ -213,6 +215,8 @@ class SkillRegistry:
                 "description": meta.description,
                 "category": meta.category,
                 "location": meta.location,
+                "provider_type": meta.provider_type,
+                "instance_required": meta.instance_required,
             }
             for meta, _ in self._skills.values()
             if meta.name not in md_derived

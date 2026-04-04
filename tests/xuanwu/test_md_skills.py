@@ -682,8 +682,8 @@ class TestAgentRunnerMdSkills:
 
     def test_primary_key_collection(self):
         """主键 md_skills_snapshot 收集"""
-        from app.xuanwu.agent.runner import AgentRunner
-        from app.xuanwu.core.deps import SkillDeps
+        from app.atlasclaw.agent.runner_prompt_context import collect_md_skills_snapshot
+        from app.atlasclaw.core.deps import SkillDeps
 
         deps = SkillDeps(
             user_token="t",
@@ -696,15 +696,14 @@ class TestAgentRunnerMdSkills:
                 ]
             },
         )
-        runner = AgentRunner.__new__(AgentRunner)
-        result = runner._collect_md_skills_snapshot(deps)
+        result = collect_md_skills_snapshot(deps)
         assert len(result) == 1
         assert result[0]["name"] == "jira"
 
     def test_fallback_key_collection(self):
         """备选键 md_skills 收集"""
-        from app.xuanwu.agent.runner import AgentRunner
-        from app.xuanwu.core.deps import SkillDeps
+        from app.atlasclaw.agent.runner_prompt_context import collect_md_skills_snapshot
+        from app.atlasclaw.core.deps import SkillDeps
 
         deps = SkillDeps(
             user_token="t",
@@ -713,14 +712,13 @@ class TestAgentRunnerMdSkills:
             channel="c",
             extra={"md_skills": [{"name": "jira"}]},
         )
-        runner = AgentRunner.__new__(AgentRunner)
-        result = runner._collect_md_skills_snapshot(deps)
+        result = collect_md_skills_snapshot(deps)
         assert len(result) == 1
 
     def test_missing_key_returns_empty(self):
         """无 md_skills 相关键时返回空列表"""
-        from app.xuanwu.agent.runner import AgentRunner
-        from app.xuanwu.core.deps import SkillDeps
+        from app.atlasclaw.agent.runner_prompt_context import collect_md_skills_snapshot
+        from app.atlasclaw.core.deps import SkillDeps
 
         deps = SkillDeps(
             user_token="t",
@@ -729,14 +727,13 @@ class TestAgentRunnerMdSkills:
             channel="c",
             extra={},
         )
-        runner = AgentRunner.__new__(AgentRunner)
-        result = runner._collect_md_skills_snapshot(deps)
+        result = collect_md_skills_snapshot(deps)
         assert result == []
 
     def test_non_dict_extra_returns_empty(self):
         """extra 为 None 或空 dict 时返回空列表"""
-        from app.xuanwu.agent.runner import AgentRunner
-        from app.xuanwu.core.deps import SkillDeps
+        from app.atlasclaw.agent.runner_prompt_context import collect_md_skills_snapshot
+        from app.atlasclaw.core.deps import SkillDeps
 
         # extra=None 应该正常工作
         deps = SkillDeps(
@@ -746,8 +743,7 @@ class TestAgentRunnerMdSkills:
             channel="c",
             extra=None,
         )
-        runner = AgentRunner.__new__(AgentRunner)
-        result = runner._collect_md_skills_snapshot(deps)
+        result = collect_md_skills_snapshot(deps)
         assert result == []
 
 
