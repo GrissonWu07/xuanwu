@@ -44,7 +44,7 @@ class SubagentRuntimeManager:
         *,
         workspace_path: str,
         max_spawn_depth: int = 1,
-        max_children_per_session: int = 5,
+        max_children_per_session: int = 2,
         max_concurrent_subagents: int = 8,
         default_timeout_seconds: int = 900,
         steer_rate_limit_ms: int = 2000,

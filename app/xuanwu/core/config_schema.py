@@ -162,6 +162,20 @@ class ToolGateConfig(BaseModel):
     )
 
 
+class SubagentRuntimeConfig(BaseModel):
+    """Subagent runtime safety and scheduling configuration."""
+
+    max_spawn_depth: int = Field(default=1, ge=1)
+    max_children_per_session: int = Field(default=2, ge=1)
+    max_concurrent_subagents: int = Field(default=8, ge=1)
+    default_timeout_seconds: int = Field(default=900, ge=0)
+    steer_rate_limit_ms: int = Field(default=2000, ge=0)
+    max_queued_batches_per_controller: int = Field(default=1, ge=0)
+    stalled_after_seconds: int = Field(default=180, ge=30)
+    retention_seconds: int = Field(default=3600, ge=300)
+    sweep_interval_seconds: int = Field(default=60, ge=5)
+
+
 class SearchProxyConfig(BaseModel):
     """Proxy settings for provider-driven web search."""
 
@@ -421,6 +435,7 @@ class XuanWuConfig(BaseModel):
     webhook: WebhookConfig = Field(default_factory=WebhookConfig)
     hooks_runtime: HooksRuntimeConfig = Field(default_factory=HooksRuntimeConfig)
     tool_gate: ToolGateConfig = Field(default_factory=ToolGateConfig)
+    subagent_runtime: SubagentRuntimeConfig = Field(default_factory=SubagentRuntimeConfig)
     search_runtime: SearchRuntimeConfig = Field(default_factory=SearchRuntimeConfig)
     heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
 
