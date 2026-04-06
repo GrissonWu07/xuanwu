@@ -252,4 +252,100 @@ describe('api-client.js', () => {
             );
         });
     });
+
+    describe('subagent session APIs', () => {
+        test('listSessionSubagents sends credentials and returns payload', async () => {
+            global.fetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({
+                    runtime_available: true,
+                    total: 1,
+                    active_batch_id: 'batch-1',
+                    queue_depth: 0,
+                    active: [],
+                    recent: []
+                })
+            });
+
+            const { listSessionSubagents } = await import('../../app/frontend/scripts/api-client.js');
+            const result = await listSessionSubagents('session-key');
+
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/sessions/session-key/subagents?recent_minutes=30',
+                expect.objectContaining({ credentials: 'include' })
+            );
+            expect(result.total).toBe(1);
+        });
+
+        test('killSessionSubagent posts to kill endpoint', async () => {
+            global.fetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ status: 'ok' })
+            });
+
+            const { killSessionSubagent } = await import('../../app/frontend/scripts/api-client.js');
+            await killSessionSubagent('session-key', 'subrun_123');
+
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/sessions/session-key/subagents/subrun_123/kill',
+                expect.objectContaining({ method: 'POST', credentials: 'include' })
+            );
+        });
+
+        test('steerSessionSubagent posts steer payload', async () => {
+            global.fetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ status: 'accepted' })
+            });
+
+            const { steerSessionSubagent } = await import('../../app/frontend/scripts/api-client.js');
+            await steerSessionSubagent('session-key', 'subrun_123', 'focus on section A');
+
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/sessions/session-key/subagents/subrun_123/steer',
+                expect.objectContaining({
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+            );
+            const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+            expect(body).toEqual({ message: 'focus on section A' });
+        });
+
+        test('retrySessionSubagent posts retry payload', async () => {
+            global.fetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ status: 'accepted' })
+            });
+
+            const { retrySessionSubagent } = await import('../../app/frontend/scripts/api-client.js');
+            await retrySessionSubagent('session-key', 'subrun_123', 'retry_with_edit', 'updated task');
+
+            expect(global.fetch).toHaveBeenCalledWith(
+                '/api/sessions/session-key/subagents/subrun_123/retry',
+                expect.objectContaining({
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+            );
+            const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+            expect(body).toEqual({ mode: 'retry_with_edit', edited_task: 'updated task' });
+        });
+
+        test('createSessionSubagentStatusStream creates EventSource with cursor', async () => {
+            const mockedSource = { close: jest.fn() };
+            global.EventSource = jest.fn(() => mockedSource);
+
+            const { createSessionSubagentStatusStream } = await import('../../app/frontend/scripts/api-client.js');
+            const source = createSessionSubagentStatusStream('session-key', 'cursor:1');
+
+            expect(global.EventSource).toHaveBeenCalledWith(
+                '/api/sessions/session-key/subagents/stream?cursor=cursor%3A1',
+                { withCredentials: true }
+            );
+            expect(source).toBe(mockedSource);
+        });
+    });
 });

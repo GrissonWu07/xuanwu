@@ -388,6 +388,12 @@ function notifyUserTurnStarted(sessionKey, messageText) {
   }
 }
 
+function notifyToolEvent(payload) {
+  if (typeof chatCallbacks.onToolEvent === 'function') {
+    chatCallbacks.onToolEvent(payload || {})
+  }
+}
+
 async function notifyRunCompleted(sessionKey) {
   const hasHistory = true
   if (typeof chatCallbacks.onRunCompleted === 'function') {
@@ -504,6 +510,7 @@ function sanitizeLinkUrl(url) {
   const normalized = (url || '').trim()
   if (!normalized) return '#'
   if (/^https?:\/\//i.test(normalized)) return normalized
+  if (normalized.startsWith('/')) return normalized
   return '#'
 }
 
@@ -745,10 +752,21 @@ async function handleStreamWithSignals(runId, signals, context) {
       },
       onToolStart: (data) => {
         pushRuntimeEntry('tool_running', `Running tool: ${data?.tool_name || 'tool'}`, { phase: 'running_tool' })
+        notifyToolEvent({
+          phase: 'start',
+          toolName: data?.tool_name || 'tool',
+          runId
+        })
         updateUI()
       },
       onToolEnd: (data) => {
         pushRuntimeEntry('waiting_for_tool', `Tool completed: ${data?.tool_name || 'tool'}`, { phase: 'tool_completed' })
+        notifyToolEvent({
+          phase: 'end',
+          toolName: data?.tool_name || 'tool',
+          runId,
+          result: data?.result || ''
+        })
         updateUI()
       },
       onThinkingStart: () => {

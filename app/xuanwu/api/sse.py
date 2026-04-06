@@ -30,6 +30,7 @@ class SSEEventType(Enum):
     HEARTBEAT = "heartbeat"
     THINKING = "thinking"
     RUNTIME = "runtime"
+    SUBAGENT_STATUS = "subagent_status"
 
 
 @dataclass
@@ -548,6 +549,17 @@ tool
                 "download_url": download_url,
                 "expires_at": expires_at,
             },
+        ))
+
+    def push_subagent_status(
+        self,
+        stream_id: str,
+        payload: dict[str, Any],
+    ) -> int:
+        """Push a subagent status event to dedicated subagent stream."""
+        return self.push_event(stream_id, SSEEvent(
+            event_type=SSEEventType.SUBAGENT_STATUS,
+            data=dict(payload or {}),
         ))
         
     def get_active_streams(self) -> list[str]:

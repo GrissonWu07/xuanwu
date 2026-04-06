@@ -161,6 +161,94 @@ export async function uploadSessionAttachment(sessionKey, file) {
     return response.json()
 }
 
+export async function listSessionSubagents(sessionKey, recentMinutes = 30) {
+    const response = await fetch(
+        buildApiUrl(
+            `/api/sessions/${encodeURIComponent(sessionKey)}/subagents?recent_minutes=${encodeURIComponent(String(recentMinutes))}`
+        ),
+        {
+            credentials: 'include'
+        }
+    )
+
+    if (!response.ok) {
+        throw new Error(`Failed to list subagents: ${response.status}`)
+    }
+
+    return response.json()
+}
+
+export async function killSessionSubagent(sessionKey, target) {
+    const response = await fetch(
+        buildApiUrl(`/api/sessions/${encodeURIComponent(sessionKey)}/subagents/${encodeURIComponent(target)}/kill`),
+        {
+            method: 'POST',
+            credentials: 'include'
+        }
+    )
+
+    if (!response.ok) {
+        throw new Error(`Failed to kill subagent: ${response.status}`)
+    }
+
+    return response.json()
+}
+
+export async function steerSessionSubagent(sessionKey, target, message) {
+    const response = await fetch(
+        buildApiUrl(`/api/sessions/${encodeURIComponent(sessionKey)}/subagents/${encodeURIComponent(target)}/steer`),
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ message: message || '' })
+        }
+    )
+
+    if (!response.ok) {
+        throw new Error(`Failed to steer subagent: ${response.status}`)
+    }
+
+    return response.json()
+}
+
+export async function retrySessionSubagent(sessionKey, target, mode = 'retry_same_context', editedTask = '') {
+    const payload = { mode: mode || 'retry_same_context' }
+    if ((mode || '').trim() === 'retry_with_edit') {
+        payload.edited_task = editedTask || ''
+    }
+
+    const response = await fetch(
+        buildApiUrl(`/api/sessions/${encodeURIComponent(sessionKey)}/subagents/${encodeURIComponent(target)}/retry`),
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        }
+    )
+
+    if (!response.ok) {
+        throw new Error(`Failed to retry subagent: ${response.status}`)
+    }
+
+    return response.json()
+}
+
+export function createSessionSubagentStatusStream(sessionKey, cursor = '') {
+    if (!sessionKey) {
+        throw new Error('sessionKey is required')
+    }
+    const normalizedCursor = String(cursor || '').trim()
+    const suffix = normalizedCursor
+        ? `?cursor=${encodeURIComponent(normalizedCursor)}`
+        : ''
+    const url = buildApiUrl(
+        `/api/sessions/${encodeURIComponent(sessionKey)}/subagents/stream${suffix}`
+    )
+    return new EventSource(url, { withCredentials: true })
+}
+
 /**
  * Delete a session
  * @param {string} sessionKey - Session key
@@ -276,6 +364,11 @@ export default {
     deleteSession,
     listSessionAttachments,
     uploadSessionAttachment,
+    listSessionSubagents,
+    createSessionSubagentStatusStream,
+    killSessionSubagent,
+    steerSessionSubagent,
+    retrySessionSubagent,
     resetSession,
     startAgentRun,
     getAgentStatus,

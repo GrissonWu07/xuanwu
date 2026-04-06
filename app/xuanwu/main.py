@@ -16,6 +16,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import quote
 
 
 from dotenv import load_dotenv
@@ -76,13 +77,21 @@ from app.xuanwu.heartbeat.models import (
 )
 from app.xuanwu.heartbeat.runtime import HeartbeatRuntime, HeartbeatRuntimeContext
 from app.xuanwu.heartbeat.store import HeartbeatStateStore
-from app.xuanwu.session.context import ChatType, SessionKey, SessionScope
+from app.xuanwu.session.context import ChatType, SessionKey, SessionScope, TranscriptEntry
 from app.xuanwu.core.token_health_store import TokenHealthStore
 from app.xuanwu.core.token_interceptor import TokenHealthInterceptor
 from app.xuanwu.core.token_pool import TokenEntry, TokenPool
 from app.xuanwu.db.database import DatabaseConfig, init_database, get_db_manager
 from app.xuanwu.db.orm.user import UserService
 from app.xuanwu.db.orm.model_config import ModelConfigService
+from app.xuanwu.subagents.runtime import SubagentRuntimeManager
+from app.xuanwu.subagents.streaming import build_subagent_status_stream_id
+from app.xuanwu.thread_files.service import ThreadFileService
+from app.xuanwu.api.attachment_links import (
+    AttachmentLinkSigner,
+    resolve_attachment_link_secret,
+    resolve_attachment_link_ttl_seconds,
+)
 from app.xuanwu.bootstrap.app_factory_helpers import (
     StaticFileCacheMiddleware,
     mount_frontend,
@@ -124,6 +133,7 @@ _hook_runtime: Optional[HookRuntime] = None
 _heartbeat_runtime: Optional[HeartbeatRuntime] = None
 _heartbeat_store: Optional[HeartbeatStateStore] = None
 _heartbeat_task: Optional[asyncio.Task] = None
+_subagent_runtime: Optional[SubagentRuntimeManager] = None
 
 
 def _list_workspace_runtime_user_ids(workspace_path: str | Path) -> set[str]:
@@ -200,7 +210,7 @@ async def lifespan(app: FastAPI):
 
 
     """Application lifespan handler for startup and shutdown."""
-    global _session_manager, _session_manager_router, _session_queue, _skill_registry, _agent_runner, _global_provider_registry, _channel_manager, _hook_state_store, _memory_sink, _context_sink, _hook_runtime, _heartbeat_runtime, _heartbeat_store, _heartbeat_task
+    global _session_manager, _session_manager_router, _session_queue, _skill_registry, _agent_runner, _global_provider_registry, _channel_manager, _hook_state_store, _memory_sink, _context_sink, _hook_runtime, _heartbeat_runtime, _heartbeat_store, _heartbeat_task, _subagent_runtime
     
     config = get_config()
     config_path = get_config_path()
@@ -321,6 +331,201 @@ async def lifespan(app: FastAPI):
     )
     _session_manager_router = SessionManagerRouter.from_manager(_session_manager)
     _session_queue = SessionQueue(max_concurrent=config.agent_defaults.max_concurrent)
+    _api_context_holder: dict[str, Any] = {"context": None}
+
+    def _build_subagent_next_step_suggestion(
+        *,
+        completed: int,
+        failed: int,
+        canceled: int,
+        artifact_count: int,
+    ) -> str:
+        if failed > 0 and completed <= 0:
+            return "Next step: use Retry with edit to fix failed tasks, then rerun the batch."
+        if failed > 0:
+            return "Next step: review completed artifacts first, then retry failed runs with edited prompts."
+        if canceled > 0 and completed > 0:
+            return "Next step: validate completed artifacts and restart canceled runs only if needed."
+        if artifact_count > 0:
+            return "Next step: open and validate generated artifacts, then continue follow-up in this chat."
+        return "Next step: continue this conversation with one focused follow-up request."
+
+    async def _collect_subagent_artifact_links(
+        user_id: str,
+        run_ids: list[str],
+    ) -> list[dict[str, Any]]:
+        if _subagent_runtime is None or _session_manager_router is None:
+            return []
+        scoped_manager = _session_manager_router.for_user(user_id)
+        signer = AttachmentLinkSigner(
+            secret_key=resolve_attachment_link_secret(),
+            default_ttl_seconds=resolve_attachment_link_ttl_seconds(),
+        )
+        collected: list[dict[str, Any]] = []
+        seen: set[tuple[str, str]] = set()
+        for run_id in run_ids:
+            record = await _subagent_runtime.get_run(user_id, run_id)
+            if record is None:
+                continue
+            child_key = str(record.child_session_key or "").strip()
+            if not child_key:
+                continue
+            try:
+                parsed = SessionKey.from_string(child_key)
+            except Exception:
+                continue
+            thread_id = parsed.thread_id or "main"
+            service = ThreadFileService(
+                workspace_path=str(scoped_manager.workspace_path),
+                user_id=user_id,
+                thread_id=thread_id,
+            )
+            artifacts = await service.list_current_thread_artifacts()
+            for artifact in artifacts:
+                dedupe_key = (child_key, artifact.artifact_id)
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                signed_url, expires_at = signer.build_signed_download_url(
+                    session_key=child_key,
+                    entry_id=artifact.artifact_id,
+                )
+                collected.append(
+                    {
+                        "run_id": run_id,
+                        "subagent_id": record.subagent_id,
+                        "entry_id": artifact.artifact_id,
+                        "name": artifact.name,
+                        "download_url": signed_url,
+                        "expires_at": expires_at,
+                        "child_session_key": child_key,
+                    }
+                )
+                if len(collected) >= 8:
+                    return collected
+        return collected
+
+    async def _push_subagent_status_event(payload: dict[str, Any]) -> None:
+        api_ctx = _api_context_holder.get("context")
+        if api_ctx is None:
+            return
+        user_id = str(payload.get("user_id", "")).strip()
+        controller_session_key = str(payload.get("controller_session_key", "")).strip()
+        if not user_id or not controller_session_key:
+            return
+        stream_id = build_subagent_status_stream_id(user_id, controller_session_key)
+        api_ctx.sse_manager.create_stream(stream_id)
+        api_ctx.sse_manager.push_subagent_status(stream_id, payload)
+
+    async def _on_subagent_run_terminal(record) -> None:
+        try:
+            scoped_manager = _session_manager_router.for_user(record.user_id)
+            status = str(record.status.value)
+            summary = (record.output or "").strip()
+            if summary and len(summary) > 280:
+                summary = summary[:277].rstrip() + "..."
+            if not summary:
+                summary = str(record.error or "no summary")
+            message = (
+                f"[Subagent {record.subagent_id}] {status}\n"
+                f"Run: {record.run_id}\n"
+                f"{summary}"
+            )
+            await scoped_manager.append_transcript(
+                record.controller_session_key,
+                TranscriptEntry(role="assistant", content=message),
+            )
+            await _push_subagent_status_event(
+                {
+                    "event": "run_terminal_receipt",
+                    "user_id": record.user_id,
+                    "controller_session_key": record.controller_session_key,
+                    "run_id": record.run_id,
+                    "subagent_id": record.subagent_id,
+                    "status": status,
+                    "message": summary,
+                }
+            )
+        except Exception:
+            return
+
+    async def _on_subagent_batch_terminal(payload: dict[str, Any]) -> None:
+        try:
+            user_id = str(payload.get("user_id", "")).strip()
+            session_key = str(payload.get("controller_session_key", "")).strip()
+            if not user_id or not session_key:
+                return
+            scoped_manager = _session_manager_router.for_user(user_id)
+            completed = int(payload.get("completed", 0) or 0)
+            failed = int(payload.get("failed", 0) or 0)
+            canceled = int(payload.get("canceled", 0) or 0)
+            total = int(payload.get("total", 0) or 0)
+            run_ids = [str(item) for item in payload.get("run_ids", []) if str(item).strip()]
+            artifact_links = await _collect_subagent_artifact_links(user_id, run_ids)
+            suggestion = _build_subagent_next_step_suggestion(
+                completed=completed,
+                failed=failed,
+                canceled=canceled,
+                artifact_count=len(artifact_links),
+            )
+            artifact_lines: list[str] = []
+            for item in artifact_links:
+                encoded_child_key = quote(str(item["child_session_key"]), safe="")
+                fallback_url = (
+                    f"/api/sessions/{encoded_child_key}/attachments/"
+                    f"{item['entry_id']}/content"
+                )
+                artifact_url = str(item.get("download_url") or "").strip() or fallback_url
+                artifact_lines.append(
+                    f"- [{item['name']}]({artifact_url}) · {item['subagent_id']}"
+                )
+            message = (
+                f"[Subagent Batch {str(payload.get('batch_id', ''))[-8:]}] completed\n"
+                f"total={total} completed={completed} failed={failed} canceled={canceled}"
+            )
+            if artifact_lines:
+                message = message + "\n\nArtifacts:\n" + "\n".join(artifact_lines)
+            message = message + f"\n\n{suggestion}"
+            await scoped_manager.append_transcript(
+                session_key,
+                TranscriptEntry(role="assistant", content=message),
+            )
+            await _push_subagent_status_event(
+                {
+                    "event": "batch_terminal_receipt",
+                    "user_id": user_id,
+                    "controller_session_key": session_key,
+                    "batch_id": str(payload.get("batch_id", "")),
+                    "total": total,
+                    "completed": completed,
+                    "failed": failed,
+                    "canceled": canceled,
+                    "artifact_count": len(artifact_links),
+                    "next_step": suggestion,
+                }
+            )
+        except Exception:
+            return
+
+    async def _on_subagent_status(payload: dict[str, Any]) -> None:
+        await _push_subagent_status_event(payload)
+
+    _subagent_runtime = SubagentRuntimeManager(
+        workspace_path=workspace_path,
+        max_spawn_depth=config.subagent_runtime.max_spawn_depth,
+        max_children_per_session=config.subagent_runtime.max_children_per_session,
+        max_concurrent_subagents=config.subagent_runtime.max_concurrent_subagents,
+        default_timeout_seconds=config.subagent_runtime.default_timeout_seconds,
+        steer_rate_limit_ms=config.subagent_runtime.steer_rate_limit_ms,
+        max_queued_batches_per_controller=config.subagent_runtime.max_queued_batches_per_controller,
+        stalled_after_seconds=config.subagent_runtime.stalled_after_seconds,
+        retention_seconds=config.subagent_runtime.retention_seconds,
+        sweep_interval_seconds=config.subagent_runtime.sweep_interval_seconds,
+        on_run_terminal=_on_subagent_run_terminal,
+        on_batch_terminal=_on_subagent_batch_terminal,
+        on_status=_on_subagent_status,
+    )
+    await _subagent_runtime.start()
     _hook_state_store = HookStateStore(workspace_path=workspace_path)
     _memory_sink = MemorySink(workspace_path=workspace_path)
     _context_sink = ContextSink(_hook_state_store)
@@ -527,6 +732,7 @@ async def lifespan(app: FastAPI):
     # Set agent runner on channel manager for message processing
     _channel_manager.set_agent_runner(_agent_runner)
     _channel_manager.set_session_manager_router(_session_manager_router)
+    _channel_manager.set_subagent_runtime(_subagent_runtime)
 
     async def _run_agent_heartbeat(job: HeartbeatJobDefinition) -> dict[str, Any]:
         session_manager = _session_manager_router.for_user(job.owner_user_id)
@@ -801,9 +1007,11 @@ async def lifespan(app: FastAPI):
         available_providers=available_providers,
         provider_instances=provider_instances,
         webhook_manager=webhook_manager,
+        subagent_runtime=_subagent_runtime,
     )
 
     set_api_context(api_context)
+    _api_context_holder["context"] = api_context
     
     print("[XuanWu] Application started successfully")
     print(f"[XuanWu] Session storage: {_session_manager.sessions_dir}")
@@ -819,6 +1027,8 @@ async def lifespan(app: FastAPI):
             await _heartbeat_task
         except asyncio.CancelledError:
             pass
+    if _subagent_runtime is not None:
+        await _subagent_runtime.stop()
 
 
 def create_app() -> FastAPI:

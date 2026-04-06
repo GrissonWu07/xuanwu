@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import pytest
 from urllib.parse import quote
 
@@ -9,12 +10,21 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.xuanwu.api.routes import APIContext, create_router, set_api_context
+from app.xuanwu.api.deps_context import get_api_context
 from app.xuanwu.auth.models import UserInfo
 from app.xuanwu.session.context import SessionKey, TranscriptEntry
 from app.xuanwu.session.manager import SessionManager
 from app.xuanwu.session.queue import SessionQueue
 from app.xuanwu.session.context import ChatType, SessionScope
 from app.xuanwu.skills.registry import SkillRegistry
+from app.xuanwu.subagents.streaming import build_subagent_status_stream_id
+from app.xuanwu.subagents.models import (
+    SpawnSubagentRequest,
+    SubagentExecutionRequest,
+    SubagentExecutionResult,
+    SubagentRunStatus,
+)
+from app.xuanwu.subagents.runtime import SubagentRuntimeManager
 
 
 def _build_client(tmp_path, user_id: str = "default") -> TestClient:
@@ -22,6 +32,26 @@ def _build_client(tmp_path, user_id: str = "default") -> TestClient:
         session_manager=SessionManager(workspace_path=str(tmp_path), user_id="default"),
         session_queue=SessionQueue(),
         skill_registry=SkillRegistry(),
+    )
+    set_api_context(ctx)
+
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def inject_user_info(request, call_next):
+        request.state.user_info = UserInfo(user_id=user_id, display_name=user_id)
+        return await call_next(request)
+
+    app.include_router(create_router())
+    return TestClient(app)
+
+
+def _build_client_with_runtime(tmp_path, runtime: SubagentRuntimeManager, user_id: str = "default") -> TestClient:
+    ctx = APIContext(
+        session_manager=SessionManager(workspace_path=str(tmp_path), user_id="default"),
+        session_queue=SessionQueue(),
+        skill_registry=SkillRegistry(),
+        subagent_runtime=runtime,
     )
     set_api_context(ctx)
 
@@ -276,3 +306,144 @@ class TestThreadSessionsAndOwnership:
         )
 
         assert response.status_code == 404
+
+
+def test_list_session_subagents_returns_runtime_unavailable_when_runtime_missing(tmp_path):
+    client = _build_client(tmp_path, user_id="alice")
+    create_response = client.post(
+        "/api/sessions",
+        json={"channel": "web", "scope": "per-peer"},
+    )
+    assert create_response.status_code == 200
+    session_key = create_response.json()["session_key"]
+    encoded_session_key = quote(session_key, safe="")
+
+    response = client.get(f"/api/sessions/{encoded_session_key}/subagents")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["runtime_available"] is False
+    assert payload["total"] == 0
+    assert payload["queue_depth"] == 0
+
+
+@pytest.mark.asyncio
+async def test_list_kill_and_steer_session_subagents(tmp_path):
+    runtime = SubagentRuntimeManager(workspace_path=str(tmp_path / "runtime"))
+    await runtime.start()
+
+    async def executor(req: SubagentExecutionRequest) -> SubagentExecutionResult:
+        await asyncio.sleep(0.2)
+        return SubagentExecutionResult(
+            status=SubagentRunStatus.COMPLETED,
+            output=f"done:{req.task}",
+        )
+
+    session_key = "agent:main:user:alice:web:dm:alice:topic:thread-1"
+    created = await runtime.spawn(
+        SpawnSubagentRequest(
+            user_id="alice",
+            requester_session_key=session_key,
+            controller_session_key=session_key,
+            task="prepare report",
+            depth=1,
+        ),
+        executor=executor,
+    )
+
+    client = _build_client_with_runtime(tmp_path, runtime, user_id="alice")
+    encoded_session_key = quote(session_key, safe="")
+
+    list_response = client.get(f"/api/sessions/{encoded_session_key}/subagents")
+    assert list_response.status_code == 200
+    payload = list_response.json()
+    assert payload["runtime_available"] is True
+    assert payload["total"] >= 1
+    assert "queue_depth" in payload
+    assert "active_batch_id" in payload
+    assert any(item["run_id"] == created.run_id for item in payload["active"])
+
+    kill_response = client.post(
+        f"/api/sessions/{encoded_session_key}/subagents/{quote(created.run_id, safe='')}/kill"
+    )
+    assert kill_response.status_code == 200
+    assert kill_response.json()["killed"] >= 1
+
+    replacement = await runtime.spawn(
+        SpawnSubagentRequest(
+            user_id="alice",
+            requester_session_key=session_key,
+            controller_session_key=session_key,
+            task="draft summary",
+            depth=1,
+        ),
+        executor=executor,
+    )
+    await asyncio.sleep(0.05)
+
+    steer_response = client.post(
+        f"/api/sessions/{encoded_session_key}/subagents/{quote(replacement.run_id, safe='')}/steer",
+        json={"message": "focus on risks"},
+    )
+    assert steer_response.status_code == 200
+    steer_payload = steer_response.json()
+    assert steer_payload["status"] == "accepted"
+    assert steer_payload["replaces_run_id"] == replacement.run_id
+    assert steer_payload["run_id"] != replacement.run_id
+
+    completed = await runtime.get_run("alice", created.run_id)
+    assert completed is not None
+    retry_response = client.post(
+        f"/api/sessions/{encoded_session_key}/subagents/{quote(created.run_id, safe='')}/retry",
+        json={"mode": "retry_same_context"},
+    )
+    assert retry_response.status_code == 200
+    assert retry_response.json()["status"] == "accepted"
+
+    batch_id = str((replacement.metadata or {}).get("batch_id", ""))
+    if batch_id:
+        kill_batch_response = client.post(
+            f"/api/sessions/{encoded_session_key}/subagents/{quote(f'batch:{batch_id}', safe='')}/kill"
+        )
+        assert kill_batch_response.status_code == 200
+        assert kill_batch_response.json()["action"] == "kill_batch"
+
+    await runtime.stop()
+
+
+def test_session_subagent_stream_supports_cursor_resume(tmp_path):
+    runtime = SubagentRuntimeManager(workspace_path=str(tmp_path / "runtime"))
+    asyncio.run(runtime.start())
+
+    session_key = "agent:main:user:alice:web:dm:alice:topic:thread-1"
+    client = _build_client_with_runtime(tmp_path, runtime, user_id="alice")
+    encoded_session_key = quote(session_key, safe="")
+    ctx = get_api_context()
+
+    stream_id = build_subagent_status_stream_id("alice", session_key)
+    ctx.sse_manager.create_stream(stream_id)
+    ctx.sse_manager.push_subagent_status(
+        stream_id,
+        {
+            "event": "spawn",
+            "user_id": "alice",
+            "controller_session_key": session_key,
+            "outcome": "queued_next_request",
+        },
+    )
+    stream_state = ctx.sse_manager.get_stream(stream_id)
+    assert stream_state is not None
+    last_event_id = stream_state.last_event_id
+    ctx.sse_manager.close_stream(stream_id)
+
+    response = client.get(f"/api/sessions/{encoded_session_key}/subagents/stream")
+    assert response.status_code == 200
+    assert "event: subagent_status" in response.text
+    assert "queued_next_request" in response.text
+
+    response_with_cursor = client.get(
+        f"/api/sessions/{encoded_session_key}/subagents/stream?cursor={quote(last_event_id, safe='')}"
+    )
+    assert response_with_cursor.status_code == 200
+    assert "queued_next_request" not in response_with_cursor.text
+
+    asyncio.run(runtime.stop())

@@ -36,6 +36,22 @@ runs rather than replace the chat surface as the primary interaction model.
   - built-in `export_docx` / `export_pptx` / `export_pdf` tools
   - artifact SSE events
   - chat upload entry and bottom attachment strip
+- Subagent runtime now has executable backend foundations:
+  - runtime-backed `sessions_spawn` with non-blocking accepted semantics
+  - runtime-unavailable spawn now returns explicit error semantics
+  - runtime-backed `subagents list/kill/steer` control path
+  - thread-level single-active-batch policy with queue (default queue slot = 1)
+  - spawn idempotency key guard for duplicate spawn prevention
+  - batch-aware controls (`kill batch`) and retry API (`retry_same_context` / `retry_with_edit`)
+  - runtime stalled flag computation in list views
+  - run/batch terminal transcript write-back callback (status summary)
+  - dedicated subagent status SSE channel with cursor recovery
+  - batch transcript receipts now include artifact links and next-step hints
+  - frontend subagent strip now supports `Retry + Edit` and conflict action hints
+  - per-user subagent run persistence and startup orphan reconciliation
+  - config-schema-backed runtime knobs (`subagent_runtime.*`)
+  - runtime wiring in API and channel message paths
+  - UX closure task continues for remaining stream-tail safety and backlog items
 
 ## Active Storage Conventions
 

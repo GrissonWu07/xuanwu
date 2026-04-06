@@ -22,10 +22,19 @@ contributors should be aware of before starting new work.
 
 ## Runtime and Orchestration Gaps
 
-- Sub-agent runtime remains a separate follow-up area and should not be mixed
-  casually into attachment work.
+- Detached orchestrator path is not fully wired to the canonical subagent
+  runtime yet (`workflow/orchestrator.py` follow-up).
+- Sub-agent runtime policy knobs are currently runtime defaults and have not
+  all been promoted into formal config schema fields yet.
 - Structured long-term memory improvements are still a separate track from the
   attachment context bundle.
+
+## Subagent UX Closure Gaps
+
+- Stream tail delivery still needs explicit guard to avoid dropping late
+  artifact/subagent terminal events at lifecycle end boundaries.
+- Role-bound permission feedback for `steer/kill/retry` actions still needs
+  explicit frontend affordances for collaborative threads.
 
 ## Documentation Gaps
 
