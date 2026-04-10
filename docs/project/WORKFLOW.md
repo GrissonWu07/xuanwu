@@ -89,6 +89,24 @@ A task is not complete unless all of the following are true:
 4. Any project-wide impact is reflected in the state docs.
 5. The next step is explicit when work remains.
 
+## No Half-Delivery Rule
+
+Xuanwu tasks must be delivered as closed loops, not partial slices.
+
+Required behavior:
+
+1. If a task plan defines multiple in-scope workstreams, all must be completed
+   before claiming completion.
+2. "Core done, follow-up later" is allowed only when the task is explicitly
+   re-scoped and the deferred part is moved into a new task with design/plan/status.
+3. If blocked, status must be marked `Blocked` with:
+   - blocker reason
+   - blocker owner
+   - unblock condition
+   - expected unblock date (if known)
+4. Final handoff must include an explicit closure statement confirming whether
+   the task is fully closed.
+
 ## Current State Rules
 
 `docs/project/state/CURRENT_STATE.md` should stay short and high-signal.

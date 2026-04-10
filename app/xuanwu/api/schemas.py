@@ -75,6 +75,72 @@ class SessionAttachmentUploadResponse(BaseModel):
     upload: SessionAttachmentEntry
 
 
+class SessionSubagentRunEntry(BaseModel):
+    run_id: str
+    subagent_id: str
+    status: str
+    task: str
+    child_session_key: str
+    depth: int = 0
+    created_at: str
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+    batch_id: str = ""
+    queue_state: str = ""
+    spawn_outcome: str = ""
+    stalled: bool = False
+    output: str = ""
+    error: str = ""
+
+
+class SessionSubagentsResponse(BaseModel):
+    runtime_available: bool = True
+    total: int = 0
+    active_batch_id: str = ""
+    queue_depth: int = 0
+    active: list[SessionSubagentRunEntry] = Field(default_factory=list)
+    recent: list[SessionSubagentRunEntry] = Field(default_factory=list)
+
+
+class SessionSubagentSteerRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000)
+
+
+class SessionSubagentKillResponse(BaseModel):
+    status: str
+    action: str
+    killed: int
+    target: str
+    session_key: str
+
+
+class SessionSubagentSteerResponse(BaseModel):
+    status: str
+    action: str
+    target: str
+    session_key: str
+    run_id: str
+    subagent_id: str
+    child_session_key: str
+    replaces_run_id: Optional[str] = None
+
+
+class SessionSubagentRetryRequest(BaseModel):
+    mode: str = Field(default="retry_same_context")
+    edited_task: Optional[str] = Field(default=None, max_length=4000)
+
+
+class SessionSubagentRetryResponse(BaseModel):
+    status: str
+    action: str
+    target: str
+    session_key: str
+    run_id: str
+    subagent_id: str
+    child_session_key: str
+    retries_run_id: Optional[str] = None
+
+
 class SessionResetRequest(BaseModel):
     archive: bool = True
 

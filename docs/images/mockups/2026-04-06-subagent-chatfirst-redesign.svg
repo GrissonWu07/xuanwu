@@ -1,0 +1,120 @@
+<svg width="1760" height="1020" viewBox="0 0 1760 1020" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1760" height="1020" fill="#EEF2F8"/>
+
+  <!-- Left frame: Running -->
+  <rect x="20" y="20" width="860" height="980" rx="20" fill="#F7FAFF" stroke="#D9E3F5"/>
+  <rect x="20" y="20" width="220" height="980" rx="20" fill="#141A2A"/>
+  <text x="44" y="62" fill="#ECF2FF" font-size="24" font-family="Segoe UI, Arial" font-weight="700">XuanWu</text>
+  <rect x="36" y="86" width="188" height="42" rx="10" fill="#2A3247"/>
+  <text x="54" y="113" fill="#E1E8FF" font-size="14" font-family="Segoe UI, Arial">New Chat</text>
+  <rect x="36" y="138" width="188" height="42" rx="10" fill="#20283D"/>
+  <text x="54" y="165" fill="#ABB8DA" font-size="14" font-family="Segoe UI, Arial">Market Intel</text>
+
+  <rect x="250" y="20" width="630" height="74" rx="20" fill="#FFFFFF" stroke="#E0E8F8"/>
+  <text x="565" y="65" fill="#1C2438" font-size="24" font-family="Segoe UI, Arial" font-weight="700" text-anchor="middle">Chat-first Subagent (Running)</text>
+
+  <rect x="278" y="118" width="574" height="108" rx="14" fill="#FFFFFF"/>
+  <text x="300" y="152" fill="#1F2A44" font-size="15" font-family="Segoe UI, Arial">Please analyze Q2 sales, compare CRM and ERP data,</text>
+  <text x="300" y="176" fill="#1F2A44" font-size="15" font-family="Segoe UI, Arial">and generate a PDF summary. Keep me updated.</text>
+  <text x="804" y="212" fill="#8090B1" font-size="12" font-family="Segoe UI, Arial">12:01 PM</text>
+
+  <rect x="278" y="248" width="574" height="172" rx="14" fill="#F1F5FD"/>
+  <text x="300" y="282" fill="#2A4D98" font-size="14" font-family="Segoe UI, Arial" font-weight="700">XuanWu Assistant</text>
+  <text x="300" y="314" fill="#233253" font-size="15" font-family="Segoe UI, Arial">Subagents started in background: SA-101, SA-102, SA-103.</text>
+  <text x="300" y="338" fill="#233253" font-size="15" font-family="Segoe UI, Arial">You can continue chatting while tasks are running.</text>
+  <text x="300" y="362" fill="#233253" font-size="15" font-family="Segoe UI, Arial">Status and outputs will be pushed here automatically.</text>
+  <rect x="300" y="376" width="214" height="30" rx="15" fill="#E8F0FF" stroke="#AFC8FF"/>
+  <text x="316" y="396" fill="#2A57B4" font-size="12" font-family="Segoe UI, Arial">Background mode enabled</text>
+
+  <!-- Bottom fixed area -->
+  <rect x="250" y="806" width="630" height="194" rx="20" fill="#FFFFFF" stroke="#DCE4F3"/>
+
+  <!-- Attachment strip -->
+  <rect x="272" y="824" width="586" height="38" rx="10" fill="#F8FBFF" stroke="#DCE6F8"/>
+  <text x="288" y="848" fill="#63779F" font-size="12" font-family="Segoe UI, Arial">Attachments</text>
+  <rect x="362" y="832" width="120" height="22" rx="11" fill="#FFFFFF" stroke="#C7D6F2"/>
+  <text x="374" y="847" fill="#334A79" font-size="11" font-family="Segoe UI, Arial">sales_notes.docx</text>
+  <text x="494" y="848" fill="#9AA8C4" font-size="12" font-family="Segoe UI, Arial">|</text>
+  <text x="510" y="848" fill="#63779F" font-size="12" font-family="Segoe UI, Arial">Outputs</text>
+  <rect x="560" y="832" width="128" height="22" rx="11" fill="#FFFFFF" stroke="#C7D6F2"/>
+  <text x="572" y="847" fill="#334A79" font-size="11" font-family="Segoe UI, Arial">q2_report.pdf</text>
+
+  <!-- Subagent strip -->
+  <rect x="272" y="868" width="586" height="52" rx="12" fill="#F8FAFF" stroke="#D5E1F8"/>
+  <text x="288" y="900" fill="#4E628F" font-size="12" font-family="Segoe UI, Arial">Subagents</text>
+  <rect x="352" y="878" width="164" height="32" rx="10" fill="#0F1A3A"/>
+  <text x="364" y="898" fill="#FFFFFF" font-size="12" font-family="Segoe UI, Arial">SA-101   RUNNING</text>
+  <text x="364" y="907" fill="#A8B8E2" font-size="10" font-family="Segoe UI, Arial">Elapsed 12m</text>
+  <rect x="526" y="878" width="72" height="32" rx="10" fill="#FFFFFF" stroke="#B8C9E8"/>
+  <text x="547" y="898" fill="#384D79" font-size="12" font-family="Segoe UI, Arial">Steer</text>
+  <rect x="604" y="878" width="58" height="32" rx="10" fill="#FFFFFF" stroke="#B8C9E8"/>
+  <text x="623" y="898" fill="#384D79" font-size="12" font-family="Segoe UI, Arial">Kill</text>
+  <rect x="668" y="878" width="124" height="32" rx="10" fill="#FFFFFF" stroke="#B8C9E8"/>
+  <text x="687" y="898" fill="#384D79" font-size="12" font-family="Segoe UI, Arial">Open Result</text>
+
+  <!-- Input -->
+  <rect x="272" y="928" width="514" height="54" rx="14" fill="#FFFFFF" stroke="#D8E2F4"/>
+  <text x="292" y="961" fill="#8595B4" font-size="14" font-family="Segoe UI, Arial">Ask follow-up...</text>
+  <rect x="796" y="928" width="62" height="54" rx="14" fill="#4D5BDA"/>
+  <text x="817" y="961" fill="#FFFFFF" font-size="22" font-family="Segoe UI, Arial">↑</text>
+
+  <!-- Right frame: Completed -->
+  <rect x="900" y="20" width="840" height="980" rx="20" fill="#F7FAFF" stroke="#D9E3F5"/>
+  <rect x="900" y="20" width="840" height="74" rx="20" fill="#FFFFFF" stroke="#E0E8F8"/>
+  <text x="1320" y="65" fill="#1C2438" font-size="24" font-family="Segoe UI, Arial" font-weight="700" text-anchor="middle">Chat-first Subagent (Completed)</text>
+
+  <rect x="932" y="118" width="776" height="122" rx="14" fill="#EEF4FF"/>
+  <text x="956" y="152" fill="#2B4E99" font-size="14" font-family="Segoe UI, Arial" font-weight="700">XuanWu Assistant (auto write-back)</text>
+  <text x="956" y="182" fill="#1F2B4A" font-size="15" font-family="Segoe UI, Arial">SA-101 completed. Summary: 12 competitors analyzed, 3 pricing clusters found.</text>
+  <text x="956" y="206" fill="#1F2B4A" font-size="15" font-family="Segoe UI, Arial">Artifacts are ready and preserved in Outputs for revisit.</text>
+  <rect x="956" y="214" width="184" height="20" rx="10" fill="#E8F2FF" stroke="#AFC8FF"/>
+  <text x="968" y="228" fill="#2A57B4" font-size="11" font-family="Segoe UI, Arial">status: COMPLETED</text>
+
+  <!-- Completion card in message timeline -->
+  <rect x="932" y="260" width="776" height="236" rx="14" fill="#FFFFFF"/>
+  <text x="956" y="296" fill="#1F2B45" font-size="28" font-family="Segoe UI, Arial" font-weight="700">Market Research SA-101</text>
+  <text x="956" y="326" fill="#5B6D93" font-size="15" font-family="Segoe UI, Arial">Executive summary and downloadable outputs</text>
+
+  <rect x="956" y="346" width="544" height="128" rx="12" fill="#F8FAFF" stroke="#DCE6F8"/>
+  <text x="976" y="378" fill="#6A7FA5" font-size="12" font-family="Segoe UI, Arial">EXECUTIVE SUMMARY</text>
+  <text x="976" y="406" fill="#27385C" font-size="15" font-family="Segoe UI, Arial">Pricing trend shifted to usage-based plans. Enterprise buyers prioritize</text>
+  <text x="976" y="430" fill="#27385C" font-size="15" font-family="Segoe UI, Arial">security controls and integration reliability in final decision cycles.</text>
+  <rect x="976" y="442" width="194" height="24" rx="12" fill="#4D5BDA"/>
+  <text x="992" y="458" fill="#FFFFFF" font-size="12" font-family="Segoe UI, Arial">Download Report (PDF)</text>
+  <rect x="1180" y="442" width="146" height="24" rx="12" fill="#FFFFFF" stroke="#B8C9E8"/>
+  <text x="1196" y="458" fill="#3A507D" font-size="12" font-family="Segoe UI, Arial">Open Raw Data</text>
+
+  <rect x="1514" y="346" width="170" height="60" rx="10" fill="#EEF2FF" stroke="#D2DEFF"/>
+  <text x="1530" y="374" fill="#4A5BD9" font-size="28" font-family="Segoe UI, Arial" font-weight="700">12</text>
+  <text x="1530" y="392" fill="#7284AF" font-size="12" font-family="Segoe UI, Arial">Competitors</text>
+  <rect x="1514" y="414" width="170" height="60" rx="10" fill="#F8FAFF" stroke="#DCE6F8"/>
+  <text x="1530" y="442" fill="#1F2B45" font-size="28" font-family="Segoe UI, Arial" font-weight="700">3</text>
+  <text x="1530" y="460" fill="#7284AF" font-size="12" font-family="Segoe UI, Arial">Pricing clusters</text>
+
+  <!-- Bottom fixed area -->
+  <rect x="932" y="806" width="776" height="194" rx="20" fill="#FFFFFF" stroke="#DCE4F3"/>
+  <rect x="954" y="824" width="732" height="38" rx="10" fill="#F8FBFF" stroke="#DCE6F8"/>
+  <text x="970" y="848" fill="#63779F" font-size="12" font-family="Segoe UI, Arial">Attachments</text>
+  <rect x="1048" y="832" width="134" height="22" rx="11" fill="#FFFFFF" stroke="#C7D6F2"/>
+  <text x="1060" y="847" fill="#334A79" font-size="11" font-family="Segoe UI, Arial">market_brief.md</text>
+  <text x="1192" y="848" fill="#9AA8C4" font-size="12" font-family="Segoe UI, Arial">|</text>
+  <text x="1208" y="848" fill="#63779F" font-size="12" font-family="Segoe UI, Arial">Outputs</text>
+  <rect x="1258" y="832" width="168" height="22" rx="11" fill="#FFFFFF" stroke="#C7D6F2"/>
+  <text x="1270" y="847" fill="#334A79" font-size="11" font-family="Segoe UI, Arial">Market_Report_SA101.pdf</text>
+
+  <rect x="954" y="868" width="732" height="52" rx="12" fill="#F8FAFF" stroke="#D5E1F8"/>
+  <text x="970" y="900" fill="#4E628F" font-size="12" font-family="Segoe UI, Arial">Subagents</text>
+  <rect x="1038" y="878" width="170" height="32" rx="10" fill="#EAF8F1" stroke="#A7E0C2"/>
+  <text x="1052" y="898" fill="#218354" font-size="12" font-family="Segoe UI, Arial">SA-101   COMPLETED</text>
+  <rect x="1218" y="878" width="124" height="32" rx="10" fill="#FFFFFF" stroke="#B8C9E8"/>
+  <text x="1238" y="898" fill="#384D79" font-size="12" font-family="Segoe UI, Arial">Open Result</text>
+  <rect x="1350" y="878" width="88" height="32" rx="10" fill="#FFFFFF" stroke="#B8C9E8"/>
+  <text x="1373" y="898" fill="#384D79" font-size="12" font-family="Segoe UI, Arial">Retry</text>
+
+  <rect x="954" y="928" width="646" height="54" rx="14" fill="#FFFFFF" stroke="#D8E2F4"/>
+  <text x="974" y="961" fill="#8595B4" font-size="14" font-family="Segoe UI, Arial">Ask follow-up or refine...</text>
+  <rect x="1610" y="928" width="76" height="54" rx="14" fill="#4D5BDA"/>
+  <text x="1637" y="961" fill="#FFFFFF" font-size="22" font-family="Segoe UI, Arial">↑</text>
+
+  <text x="40" y="992" fill="#6F7FA1" font-size="12" font-family="Segoe UI, Arial">Design principles: chat-first, compact fixed strips, automatic terminal write-back, dual artifact entry.</text>
+</svg>

@@ -276,15 +276,9 @@ class TestSubAgentResourceCleanup:
             tools="read,write,exec"
         )
         
-        # 验证：子 Agent 创建成功 (ToolResult.to_dict() 格式)
-        assert result["is_error"] is False
-        assert "subagent_id" in result.get("details", {})
-        
-        subagent_id = result["details"]["subagent_id"]
-        session_key = result["details"]["session_key"]
-        
-        # 验证：session 被创建
-        assert session_key.startswith("subagent-")
+        # 无 runtime 上下文时应返回显式错误，避免假 accepted。
+        assert result["is_error"] is True
+        assert result["details"]["status"] == "runtime_unavailable"
         
     @pytest.mark.asyncio
     async def test_session_queue_cleanup(self):

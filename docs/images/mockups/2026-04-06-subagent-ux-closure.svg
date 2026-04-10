@@ -1,0 +1,50 @@
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="900" fill="#F3F5FA"/>
+  <rect x="16" y="16" width="280" height="868" rx="18" fill="#171A24"/>
+  <text x="46" y="58" fill="#E8ECF8" font-size="22" font-family="Segoe UI, Arial" font-weight="700">XuanWu</text>
+  <rect x="34" y="84" width="244" height="44" rx="12" fill="#2B3143"/>
+  <text x="54" y="112" fill="#DCE4FF" font-size="16" font-family="Segoe UI, Arial">New Chat</text>
+  <rect x="34" y="146" width="244" height="44" rx="12" fill="#2B3143"/>
+  <text x="54" y="174" fill="#AAB4D4" font-size="15" font-family="Segoe UI, Arial">Thread A</text>
+
+  <rect x="314" y="16" width="1110" height="868" rx="18" fill="#FFFFFF"/>
+  <rect x="314" y="16" width="1110" height="64" rx="18" fill="#F8FAFF"/>
+  <text x="850" y="54" fill="#1C2235" font-size="24" font-family="Segoe UI, Arial" font-weight="700" text-anchor="middle">Chat + Subagent 闭环交互</text>
+
+  <rect x="346" y="108" width="1048" height="108" rx="16" fill="#EEF3FF" stroke="#C7D5FF"/>
+  <text x="372" y="142" fill="#30448B" font-size="16" font-family="Segoe UI, Arial" font-weight="700">Assistant</text>
+  <text x="372" y="172" fill="#1F2A4A" font-size="15" font-family="Segoe UI, Arial">已受理子任务：sub_82af1e（处理中）</text>
+  <text x="372" y="196" fill="#1F2A4A" font-size="15" font-family="Segoe UI, Arial">你可以继续聊天，任务完成后会自动回推结果卡片。</text>
+
+  <rect x="346" y="236" width="1048" height="174" rx="16" fill="#F8FBFF" stroke="#DBE6FF"/>
+  <text x="372" y="268" fill="#3B4A73" font-size="16" font-family="Segoe UI, Arial" font-weight="700">子任务完成回推（自动消息）</text>
+  <rect x="372" y="286" width="1010" height="108" rx="12" fill="#FFFFFF" stroke="#CDD9F9"/>
+  <text x="394" y="318" fill="#1E2B4A" font-size="15" font-family="Segoe UI, Arial">sub_82af1e 已完成：已生成《Q2运营分析》</text>
+  <rect x="394" y="334" width="310" height="40" rx="10" fill="#EEF5FF" stroke="#8DB2FF"/>
+  <text x="413" y="359" fill="#2755B7" font-size="14" font-family="Segoe UI, Arial">[artifact] q2-report.pdf（可下载）</text>
+  <rect x="716" y="334" width="286" height="40" rx="10" fill="#EEF5FF" stroke="#8DB2FF"/>
+  <text x="734" y="359" fill="#2755B7" font-size="14" font-family="Segoe UI, Arial">[artifact] summary.docx（可下载）</text>
+
+  <rect x="346" y="430" width="1048" height="90" rx="14" fill="#F7FAFF" stroke="#D8E5FF"/>
+  <text x="372" y="464" fill="#4A5A86" font-size="14" font-family="Segoe UI, Arial">消息内出现一次产物卡片（可点击）</text>
+  <text x="372" y="488" fill="#4A5A86" font-size="14" font-family="Segoe UI, Arial">同时保留在附件区可再次访问（满足“双入口一致”）</text>
+
+  <rect x="346" y="704" width="1048" height="64" rx="14" fill="#FFFFFF" stroke="#D6DEEE"/>
+  <text x="372" y="742" fill="#7A879F" font-size="15" font-family="Segoe UI, Arial">输入消息...</text>
+
+  <rect x="346" y="774" width="1048" height="34" rx="10" fill="#FBFDFF" stroke="#DCE5F6"/>
+  <text x="372" y="796" fill="#697997" font-size="13" font-family="Segoe UI, Arial">附件区（固定一小行，持续可见）: Attachments | Outputs</text>
+
+  <rect x="346" y="814" width="1048" height="52" rx="12" fill="#F6FAFF" stroke="#BFD5FF"/>
+  <text x="372" y="844" fill="#2A4F9D" font-size="14" font-family="Segoe UI, Arial" font-weight="700">Subagents（固定状态条）</text>
+  <rect x="520" y="825" width="230" height="30" rx="15" fill="#EAF2FF" stroke="#8EB3FF"/>
+  <text x="536" y="845" fill="#2957BC" font-size="13" font-family="Segoe UI, Arial">sub_82af1e  RUNNING</text>
+  <rect x="762" y="825" width="112" height="30" rx="15" fill="#FFFFFF" stroke="#AFC3EE"/>
+  <text x="794" y="845" fill="#3D4E74" font-size="13" font-family="Segoe UI, Arial">Steer</text>
+  <rect x="884" y="825" width="96" height="30" rx="15" fill="#FFFFFF" stroke="#AFC3EE"/>
+  <text x="918" y="845" fill="#3D4E74" font-size="13" font-family="Segoe UI, Arial">Kill</text>
+  <rect x="990" y="825" width="134" height="30" rx="15" fill="#FFFFFF" stroke="#AFC3EE"/>
+  <text x="1017" y="845" fill="#3D4E74" font-size="13" font-family="Segoe UI, Arial">Open Result</text>
+
+  <text x="1158" y="844" fill="#6F7E9C" font-size="12" font-family="Segoe UI, Arial">自动刷新 + 会话内可追溯</text>
+</svg>

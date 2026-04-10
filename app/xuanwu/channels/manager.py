@@ -16,6 +16,7 @@ from .registry import ChannelRegistry
 from app.xuanwu.auth.models import UserInfo
 from app.xuanwu.db.orm.channel_config import ChannelConfigService
 from app.xuanwu.session.context import ChatType, SessionKey, SessionScope
+from app.xuanwu.subagents.executor import create_subagent_executor
 
 if TYPE_CHECKING:
     from app.xuanwu.agent.runner import AgentRunner
@@ -38,6 +39,7 @@ class ChannelManager:
         self._active_connections: Dict[str, ChannelHandler] = {}
         self._agent_runner: Optional["AgentRunner"] = None
         self._session_manager_router: Optional["SessionManagerRouter"] = None
+        self._subagent_runtime: Optional[Any] = None
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None
     
     def set_agent_runner(self, agent_runner: "AgentRunner") -> None:
@@ -56,6 +58,10 @@ class ChannelManager:
     def set_session_manager_router(self, session_manager_router: "SessionManagerRouter") -> None:
         """Set the per-user session manager router used by channel traffic."""
         self._session_manager_router = session_manager_router
+
+    def set_subagent_runtime(self, subagent_runtime: Any) -> None:
+        """Set subagent runtime manager for channel-originated runs."""
+        self._subagent_runtime = subagent_runtime
 
     async def initialize_connection(
         self,
@@ -236,6 +242,18 @@ class ChannelManager:
                     "external_chat_type": self._resolve_chat_type(message).value,
                 },
             )
+            if self._subagent_runtime is not None and scoped_session_manager is not None:
+                deps.extra["subagent_runtime"] = self._subagent_runtime
+                deps.extra["subagent_depth"] = int(deps.extra.get("subagent_depth", 0) or 0)
+                deps.extra["subagent_executor"] = create_subagent_executor(
+                    runner=self._agent_runner,
+                    session_manager=scoped_session_manager,
+                    user_info=user_info,
+                    request_cookies={},
+                    provider_config={},
+                    base_extra=deps.extra,
+                    subagent_runtime=self._subagent_runtime,
+                )
             # Collect response from agent
             response_text = ""
             event_count = 0

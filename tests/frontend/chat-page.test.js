@@ -7,6 +7,43 @@ beforeEach(() => {
   sessionStorage.clear()
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url)
+    if (target.includes('/api/sessions/session-a/subagents')) {
+      if (target.includes('/kill')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: 'ok', killed: 1 })
+        })
+      }
+      if (target.includes('/steer')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: 'accepted', run_id: 'subrun-2' })
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          runtime_available: true,
+          total: 1,
+          active: [
+            {
+              run_id: 'subrun-1',
+              subagent_id: 'sub-1',
+              status: 'running',
+              task: 'collect data',
+              child_session_key: 'agent:main:user:default:web:dm:default:topic:child-1',
+              depth: 1,
+              created_at: '2026-03-28T09:00:00Z',
+              started_at: '2026-03-28T09:00:01Z',
+              ended_at: null,
+              output: '',
+              error: ''
+            }
+          ],
+          recent: []
+        })
+      })
+    }
     if (target.endsWith('/api/sessions/session-a/attachments')) {
       if (options.method === 'POST') {
         return Promise.resolve({
@@ -125,6 +162,8 @@ describe('chat page', () => {
     expect(sidebar.textContent).not.toContain('Today')
     expect(container.textContent).toContain('brief.txt')
     expect(container.textContent).toContain('report.md')
+    expect(container.textContent).toContain('Subagents')
+    expect(container.textContent).toContain('sub-1')
 
     const searchInput = sidebar.querySelector('#session-search-input')
     searchInput.value = 'approvals'

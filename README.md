@@ -3,7 +3,7 @@
 
 # XuanWu
 
-![XuanWu logo](docs/images/xuanwu-icon.png)
+![XuanWu logo]
 
 XuanWu is a centralized intelligent-agent platform for both enterprise and individual users. It fully preserves OpenClaw-compatible core capabilities while extending security and device integration foundations, so teams can build, deploy, and govern intelligent agents from a unified control plane.
 
@@ -33,8 +33,6 @@ XuanWu addresses these needs with a platform-oriented agent architecture:
 - API-first interaction model with REST, WebSocket, SSE, and webhook entry points
 - Flexible model backend support via external model providers
 - Built-in path for secure sandboxed execution and policy enforcement
-
-### OpenClaw Compatibility (Current)
 
 | Capability | Status | Notes |
 |---|---|---|

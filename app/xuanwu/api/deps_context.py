@@ -17,6 +17,7 @@ from ..session.manager import SessionManager
 from ..session.queue import SessionQueue
 from ..session.router import SessionManagerRouter
 from ..skills.registry import SkillRegistry
+from ..subagents.executor import create_subagent_executor
 from ..hooks.runtime import HookRuntime
 from ..hooks.runtime_sinks import ContextSink, MemorySink
 from ..hooks.runtime_store import HookStateStore
@@ -45,6 +46,7 @@ class APIContext:
     available_providers: dict[str, list[str]] = None
     provider_instances: dict[str, dict[str, dict[str, Any]]] = None
     webhook_manager: Optional[WebhookDispatchManager] = None
+    subagent_runtime: Optional[Any] = None
     active_runs: dict[str, dict[str, Any]] = None
 
     def __post_init__(self):
@@ -161,6 +163,20 @@ def build_scoped_deps(
     }
     if extra:
         deps_extra.update(extra)
+
+    subagent_runtime = ctx.subagent_runtime
+    if subagent_runtime is not None and ctx.agent_runner is not None:
+        deps_extra["subagent_runtime"] = subagent_runtime
+        deps_extra["subagent_executor"] = create_subagent_executor(
+            runner=ctx.agent_runner,
+            session_manager=scoped_session_mgr,
+            user_info=user_info,
+            request_cookies=request_cookies,
+            provider_config=provider_config or {},
+            base_extra=deps_extra,
+            subagent_runtime=subagent_runtime,
+        )
+        deps_extra.setdefault("subagent_depth", int(deps_extra.get("subagent_depth", 0) or 0))
 
     return SkillDeps(
         user_info=user_info,
