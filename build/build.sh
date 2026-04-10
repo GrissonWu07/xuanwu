@@ -255,9 +255,8 @@ if [ ! -f "$BUILD_DIR/config/xuanwu.json" ]; then
       }
     ]
   },
-  "providers_root": "/app/extensions/providers",
-  "skills_root": "/app/extensions/skills",
-  "channels_root": "/app/extensions/channels",
+  "skills_root": "/app/workspace/skills",
+  "channels_root": "/app/workspace/channels",
   "service_providers": {},
   "webhook": {
     "enabled": false,

@@ -20,9 +20,8 @@
     "echo": false
   },
 
-  "providers_root": "../atlasclaw-providers/providers",
-  "skills_root": "../atlasclaw-providers/skills",
-  "channels_root": "../atlasclaw-providers/channels",
+  "skills_root": "./.xuanwu/skills",
+  "channels_root": "./.xuanwu/channels",
   "tool_gate": {
     "enable_model_classifier": true
   },
@@ -151,11 +150,11 @@
     "skill_sources": [
       {
         "provider": "smartcmp",
-        "root": "../UniClaw-Providers/SmartCMP-Provider/skills"
+        "root": "./.xuanwu/skills"
       },
       {
         "provider": "jira",
-        "root": "app/xuanwu/providers/jira/skills"
+        "root": "./.xuanwu/skills"
       }
     ],
     "systems": [

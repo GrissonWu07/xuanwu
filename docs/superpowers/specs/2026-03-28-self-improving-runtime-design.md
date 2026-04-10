@@ -412,7 +412,7 @@ Phase 1 不直接暴露某个 skill 专属 API，而是先暴露 hook runtime �
 
 ## Compatibility with self-improving Skill
 
-当前 `atlasclaw-providers/skills/self-improving/SKILL.md` 继续保留，其角色是：
+当前 `app/xuanwu/skills/self-improving/SKILL.md` 继续保留，其角色是：
 
 - 行为规则文档
 - 人类可读规范

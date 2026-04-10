@@ -36,6 +36,10 @@ runs rather than replace the chat surface as the primary interaction model.
   - built-in `export_docx` / `export_pptx` / `export_pdf` tools
   - artifact SSE events
   - chat upload entry and bottom attachment strip
+- Deployment defaults no longer depend on a separate providers repository:
+  - built-in skills/channels/providers are shipped in `app/xuanwu/*`
+  - user-downloaded skills/channels/providers load from workspace roots (`/app/workspace/*`)
+  - missing external `providers_root` is treated as optional
 - Subagent runtime now has executable backend foundations:
   - runtime-backed `sessions_spawn` with non-blocking accepted semantics
   - runtime-unavailable spawn now returns explicit error semantics

@@ -12,18 +12,19 @@ XuanWu container uses the following internal directory structure:
 │   ├── xuanwu.json  # Main configuration file
 │   └── logs/           # Application logs
 ├── data/               # Database files
-└── extensions/         # Custom extensions
-    ├── providers/      # Service provider integrations
-    ├── skills/         # Custom skills
-    └── channels/       # Channel integrations
+└── app/xuanwu/         # Built-in runtime package
+    ├── skills/         # Built-in skills
+    ├── channels/       # Built-in channels
+    └── providers/      # Optional built-in provider templates
+
+/app/workspace/
+├── skills/             # Downloaded/custom skills
+└── channels/           # Downloaded/custom channels
 ```
 
 **Host Mount Points:**
 - Host `/opt/xuanwu/workspace` → Container `/app/workspace`
 - Host `/opt/xuanwu/data` → Container `/app/data`
-- Host `/opt/xuanwu/extensions/providers` → Container `/app/extensions/providers`
-- Host `/opt/xuanwu/extensions/skills` → Container `/app/extensions/skills`
-- Host `/opt/xuanwu/extensions/channels` → Container `/app/extensions/channels`
 
 ## Quick Comparison
 
@@ -108,7 +109,7 @@ By default, images are tagged for Aliyun Container Registry (ACR) Shanghai:
 cd build
 
 # Create host directories
-mkdir -p /opt/xuanwu/{workspace,data,extensions/{providers,skills,channels}}
+mkdir -p /opt/xuanwu/{workspace,data}
 
 # Copy config to workspace
 cp config/xuanwu.json /opt/xuanwu/workspace/
@@ -142,7 +143,7 @@ docker-compose up -d
 cd build
 
 # Create host directories
-mkdir -p /opt/xuanwu/{workspace,data,extensions/{providers,skills,channels}}
+mkdir -p /opt/xuanwu/{workspace,data}
 
 # Copy config to workspace
 cp config/xuanwu.json /opt/xuanwu/workspace/

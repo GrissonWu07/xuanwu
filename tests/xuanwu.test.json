@@ -1,8 +1,8 @@
 {
   "agents_dir": "./.xuanwu-test",
-  "providers_root": "../../xuanwu-providers/providers",
-  "skills_root": "../../xuanwu-providers/skills",
-  "channels_root": "../../xuanwu-providers/channels",
+  "providers_root": "../.xuanwu/providers",
+  "skills_root": "../.xuanwu/skills",
+  "channels_root": "../.xuanwu/channels",
   "model": {
     "primary": "test-token-1",
     "fallbacks": [],

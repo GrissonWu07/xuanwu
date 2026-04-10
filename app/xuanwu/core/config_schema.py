@@ -408,15 +408,15 @@ class XuanWuConfig(BaseModel):
     database: Optional[DatabaseConfig] = Field(default=None, description="Database configuration")
     agents_dir: str = Field(default="~/.xuanwu/agents", description="Agent directory (backward compatibility)")
     providers_root: str = Field(
-        default="../providers",
-        description="Root directory for provider templates and skills, resolved relative to xuanwu.json",
+        default="./.xuanwu/providers",
+        description="Optional root directory for provider templates and provider-scoped skills, resolved relative to xuanwu.json",
     )
     skills_root: str = Field(
-        default="../skills",
+        default="./.xuanwu/skills",
         description="Root directory for standalone skills (not tied to providers), resolved relative to xuanwu.json",
     )
     channels_root: str = Field(
-        default="../channels",
+        default="./.xuanwu/channels",
         description="Root directory for system-level channel configurations, resolved relative to xuanwu.json",
     )
     

@@ -215,11 +215,12 @@ Multiple instances per provider type are supported. Instance names (`prod`, `dev
 
 ### 3.3 Webhook Configuration
 
-Configure inbound webhooks for provider-qualified skills already loaded from `providers_root` (for example, triggered by SmartCMP):
+Configure inbound webhooks for provider-qualified skills already loaded from built-in and extension skill roots (for example, triggered by SmartCMP):
 
 ```json
 {
-  "providers_root": "../xuanwu-providers/providers",
+  "skills_root": "./.xuanwu/skills",
+  "channels_root": "./.xuanwu/channels",
   "webhook": {
     "enabled": true,
     "header_name": "X-XuanWu-SK",

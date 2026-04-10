@@ -43,7 +43,7 @@
 - Modify: `xuanwu/tests/xuanwu/test_main_startup.py`
 - Modify: `xuanwu/tests/xuanwu/test_webhook_dispatch.py`
 - Modify: `xuanwu/README.md`
-- Modify: `xuanwu-providers/README.md`
+- Modify: built-in skill loading notes in `README.md`
 
 **Step 1: Update tests to expect `jira:jira-issue` and remove `skill_sources` setup.**
 

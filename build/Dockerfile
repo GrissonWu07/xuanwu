@@ -28,11 +28,10 @@ COPY migrations/ ./migrations/
 COPY alembic.ini .
 
 # Create necessary directories (all under /app in container)
-# - /app/workspace: user data, config, logs
+# - /app/workspace: user data, config, logs, downloaded skills/channels
 # - /app/data: database files
-# - /app/extensions: custom providers, skills, channels
 RUN mkdir -p /app/workspace /app/data /app/workspace/logs \
-    /app/extensions/providers /app/extensions/skills /app/extensions/channels
+    /app/workspace/skills /app/workspace/channels
 
 # Expose port
 EXPOSE 9000

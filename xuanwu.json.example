@@ -22,10 +22,8 @@
     "max_overflow": 10,
     "echo": false
   },
-  "providers_root": "../xuanwu-providers/providers",
-
-  "skills_root": "../xuanwu-providers/skills",
-  "channels_root": "../xuanwu-providers/channels",
+  "skills_root": "./.xuanwu/skills",
+  "channels_root": "./.xuanwu/channels",
 
   "model": {
     "_comment": "Token pool configuration for multi-token LLM access. Set reasoning: true for models that support thinking/reasoning output.",
@@ -75,7 +73,7 @@
   },
 
   "webhook": {
-    "_comment": "Inbound webhook dispatch for provider-qualified markdown skills already loaded from providers_root.",
+    "_comment": "Inbound webhook dispatch for provider-qualified markdown skills already loaded from configured roots.",
     "enabled": true,
     "header_name": "X-XuanWu-SK",
     "systems": [
