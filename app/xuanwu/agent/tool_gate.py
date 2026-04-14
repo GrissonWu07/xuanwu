@@ -1,10 +1,32 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+import inspect
+from typing import Any, Optional
 
-from app.atlasclaw.agent.tool_gate_models import CapabilityMatchResult, ToolCandidate, ToolPolicyMode
+from app.xuanwu.agent.tool_gate_models import (
+    CapabilityMatchResult,
+    ToolCandidate,
+    ToolGateDecision,
+    ToolPolicyMode,
+)
+
+
+_TOOL_CLASS_BY_NAME: dict[str, str] = {
+    "web_search": "web_search",
+    "web_fetch": "web_fetch",
+    "openmeteo_weather": "weather",
+    "browser": "browser",
+    "memory_search": "memory",
+    "memory_get": "memory",
+    "session_status": "session",
+    "sessions_list": "session",
+    "sessions_history": "session",
+    "sessions_send": "session",
+    "sessions_spawn": "session",
+    "subagents": "session",
+}
 
 _TOOL_PRIORITY: dict[str, int] = {
     "provider": 120,
@@ -17,6 +39,68 @@ _TOOL_PRIORITY: dict[str, int] = {
     "session": 40,
     "hooks_context": 30,
 }
+
+
+class ToolNecessityGate:
+    """Classify whether a user request can be answered directly or needs tools."""
+
+    def classify(self, user_message: str, recent_history: list[dict[str, Any]]) -> ToolGateDecision:
+        _ = (user_message, recent_history)
+        return ToolGateDecision(
+            reason="No classifier decision was provided; runtime defaults to direct-answer mode.",
+            confidence=0.0,
+            policy=ToolPolicyMode.ANSWER_DIRECT,
+        )
+
+    async def classify_async(
+        self,
+        user_message: str,
+        recent_history: list[dict[str, Any]],
+        *,
+        classifier: Optional[Any] = None,
+    ) -> ToolGateDecision:
+        """Use an explicit classifier when available, otherwise return a neutral default."""
+        classifier_decision = await self._classify_with_classifier(
+            user_message=user_message,
+            recent_history=recent_history,
+            classifier=classifier,
+        )
+        if classifier_decision is not None:
+            return classifier_decision
+        return self.classify(user_message, recent_history)
+
+    async def _classify_with_classifier(
+        self,
+        *,
+        user_message: str,
+        recent_history: list[dict[str, Any]],
+        classifier: Optional[Any],
+    ) -> Optional[ToolGateDecision]:
+        if classifier is None:
+            return None
+        if isinstance(classifier, ToolGateDecision):
+            return classifier
+        if isinstance(classifier, dict):
+            return self._normalize_classifier_decision(classifier)
+        if not hasattr(classifier, "classify"):
+            return None
+        decision = classifier.classify(user_message, recent_history)
+        if inspect.isawaitable(decision):
+            decision = await decision
+        return self._normalize_classifier_decision(decision)
+
+    @staticmethod
+    def _normalize_classifier_decision(raw: Any) -> Optional[ToolGateDecision]:
+        if raw is None:
+            return None
+        if isinstance(raw, ToolGateDecision):
+            return raw
+        if isinstance(raw, dict):
+            try:
+                return ToolGateDecision.model_validate(raw)
+            except Exception:
+                return None
+        return None
 
 
 @dataclass
@@ -79,13 +163,29 @@ class CapabilityMatcher:
         return sorted(matches, key=lambda item: item.priority, reverse=True)
 
     def _infer_capability_class(self, tool: dict[str, Any]) -> str:
-        lowered_name = str(tool.get("name", "")).strip().lower()
+        name = str(tool.get("name", "")).strip()
+        lowered_name = name.lower()
+        if lowered_name in _TOOL_CLASS_BY_NAME:
+            return _TOOL_CLASS_BY_NAME[lowered_name]
+
         explicit = str(tool.get("capability_class", "") or "").strip()
         if explicit:
             lowered_explicit = explicit.lower()
+            # Some snapshots provide coarse classes like "builtin:web". Keep
+            # known fine-grained classes and provider classes; otherwise fall
+            # back to heuristic inference by tool name/description.
             if lowered_explicit.startswith("provider:"):
                 return lowered_explicit
-            return lowered_explicit
+            if lowered_explicit in {
+                "web_search",
+                "web_fetch",
+                "weather",
+                "browser",
+                "memory",
+                "session",
+                "skill",
+            }:
+                return lowered_explicit
 
         provider_type = str(tool.get("provider_type", "")).strip().lower()
         category = str(tool.get("category", "")).strip().lower()
@@ -93,10 +193,16 @@ class CapabilityMatcher:
             return f"provider:{provider_type}"
 
         description = str(tool.get("description", "")).lower()
-        if "skill" in category:
+        if "skill" in category and lowered_name not in _TOOL_CLASS_BY_NAME:
             return "skill"
-        if "jira" in description:
+        if "jira" in lowered_name or "jira" in description:
             return "provider:jira"
+        if "browser" in lowered_name or "browser" in description:
+            return "browser"
+        if "search" in lowered_name and "web" in lowered_name:
+            return "web_search"
+        if "fetch" in lowered_name and "web" in lowered_name:
+            return "web_fetch"
         if "skill" in lowered_name or "skill" in description:
             return "skill"
         return "provider:generic" if "provider" in description else lowered_name

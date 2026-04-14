@@ -20,9 +20,11 @@
     "echo": false
   },
 
-  "providers_root": "../atlasclaw-providers/providers",
-  "skills_root": "../atlasclaw-providers/skills",
-  "channels_root": "../atlasclaw-providers/channels",
+  "skills_root": "./.xuanwu/skills",
+  "channels_root": "./.xuanwu/channels",
+  "tool_gate": {
+    "enable_model_classifier": true
+  },
   "search_runtime": {
     "default_provider": "bing_html_fallback",
     "provider_timeout_seconds": 8.0,
@@ -87,10 +89,17 @@
     "smartcmp": {
       "default": {
         "base_url": "${CMP_URL}",
-        "auth_type": "cookie",
         "cookie": "${CMP_COOKIE}",
         "username": "${CMP_USERNAME}",
         "password": "${CMP_PASSWORD}"
+      }
+    },
+    "dingtalk": {
+      "default": {
+        "base_url": "https://oapi.dingtalk.com",
+        "app_key": "${DINGTALK_APP_KEY}",
+        "app_secret": "${DINGTALK_APP_SECRET}",
+        "agent_id": "${DINGTALK_AGENT_ID}"
       }
     }
   },

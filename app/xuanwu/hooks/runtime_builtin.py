@@ -4,8 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from app.atlasclaw.hooks.runtime import HookHandlerDefinition, HookRuntime
-from app.atlasclaw.hooks.runtime_models import HookEventType, PendingHookItem
+from app.xuanwu.hooks.runtime import HookHandlerDefinition, HookRuntime
+from app.xuanwu.hooks.runtime_models import HookEventType, PendingHookItem
 
 
 RUNTIME_AUDIT_MODULE = "runtime-audit"

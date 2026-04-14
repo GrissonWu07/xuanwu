@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.atlasclaw.heartbeat.channel_executor import ChannelHeartbeatExecutor
-from app.atlasclaw.heartbeat.models import HeartbeatJobDefinition, HeartbeatJobType
+from app.xuanwu.heartbeat.channel_executor import ChannelHeartbeatExecutor
+from app.xuanwu.heartbeat.models import HeartbeatJobDefinition, HeartbeatJobType
 
 
 async def _failing_channel_probe(job: HeartbeatJobDefinition) -> dict[str, object]:

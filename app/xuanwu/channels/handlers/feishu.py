@@ -14,7 +14,6 @@ import secrets
 import threading
 import time
 from typing import Any, Callable, Dict, Optional
-from urllib.parse import urlparse
 
 import aiohttp
 
@@ -29,7 +28,38 @@ from ..models import (
 )
 
 logger = logging.getLogger(__name__)
-VERIFY_TIMEOUT_SECONDS = 2.6
+_AT_TAG_PATTERN = re.compile(r"<at\b[^>]*>", re.IGNORECASE)
+
+
+def _extract_text_and_mention(content: Any) -> tuple[str, bool]:
+    """Extract plain text and whether content contains mention markers."""
+    has_mention = False
+    text = ""
+
+    if isinstance(content, str):
+        text = content
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                parsed_text = parsed.get("text")
+                if isinstance(parsed_text, str) and parsed_text:
+                    text = parsed_text
+                mentions = parsed.get("mentions") or parsed.get("at_users")
+                has_mention = bool(mentions)
+        except Exception:
+            pass
+    elif isinstance(content, dict):
+        parsed_text = content.get("text")
+        text = parsed_text if isinstance(parsed_text, str) else str(content)
+        mentions = content.get("mentions") or content.get("at_users")
+        has_mention = bool(mentions)
+    else:
+        text = str(content)
+
+    if not has_mention and isinstance(text, str):
+        has_mention = bool(_AT_TAG_PATTERN.search(text))
+
+    return text, has_mention
 
 
 def _run_feishu_sdk_process(
@@ -191,21 +221,14 @@ class FeishuHandler(ChannelHandler):
             self._status = ConnectionStatus.ERROR
             return False
     
-    @staticmethod
-    def _looks_like_http_url(url: str) -> bool:
-        """Check whether the webhook URL is a valid HTTP(S) address."""
-        parsed = urlparse(url)
-        return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
-
-    async def _verify_credentials(self, config: Optional[Dict[str, Any]] = None) -> bool:
+    async def _verify_credentials(self) -> bool:
         """Verify Feishu credentials by getting tenant_access_token.
         
         This validates the app_id/app_secret before starting the SDK subprocess.
         Returns True if credentials are valid, False otherwise.
         """
-        verify_config = config or self.config
-        app_id = verify_config.get("app_id")
-        app_secret = verify_config.get("app_secret")
+        app_id = self.config.get("app_id")
+        app_secret = self.config.get("app_secret")
         
         if not app_id or not app_secret:
             logger.error("[Feishu] Missing app_id or app_secret")
@@ -215,11 +238,7 @@ class FeishuHandler(ChannelHandler):
             url = f"{self.FEISHU_API_BASE}/auth/v3/tenant_access_token/internal"
             payload = {"app_id": app_id, "app_secret": app_secret}
             async with aiohttp.ClientSession(trust_env=True) as session:
-                async with session.post(
-                    url,
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=VERIFY_TIMEOUT_SECONDS),
-                ) as resp:
+                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                     data = await resp.json()
                     if data.get("code") == 0 and data.get("tenant_access_token"):
                         logger.info("[Feishu] Credentials verified successfully")
@@ -230,17 +249,6 @@ class FeishuHandler(ChannelHandler):
         except Exception as e:
             logger.error(f"[Feishu] Credential verification error: {e}")
             return False
-
-    async def _verify_webhook_endpoint(self, webhook_url: str) -> Optional[str]:
-        """Perform static validation for the Feishu webhook URL."""
-        if not self._looks_like_http_url(webhook_url):
-            return "webhook_url must be a valid HTTP/HTTPS URL"
-        parsed = urlparse(webhook_url)
-        if parsed.scheme != "https":
-            return "webhook_url must use HTTPS"
-        if parsed.username or parsed.password:
-            return "webhook_url must not include credentials"
-        return None
 
     async def _cleanup_connect_failure(self) -> None:
         """Cleanup resources after connect failure."""
@@ -320,8 +328,8 @@ class FeishuHandler(ChannelHandler):
                         await self._cleanup_connect_failure()
                         return False
                 except queue.Empty:
-                    # Fallback: if process is still alive after 10 seconds,
-                    # consider it connected (Queue signal may not arrive on Windows)
+                    # Fallback for Windows/IPC edge cases: if process is still alive
+                    # after 10 seconds, treat connection as established.
                     elapsed = time.time() - start_time
                     if elapsed > 10.0 and self._process.is_alive():
                         logger.info("Feishu process alive after 10s, assuming connected (Queue fallback)")
@@ -627,26 +635,22 @@ class FeishuHandler(ChannelHandler):
             errors.append("Config must be a dictionary")
             return ChannelValidationResult(valid=False, errors=errors)
         
-        connection_mode = config.get("connection_mode")
-        if not connection_mode:
-            connection_mode = "webhook" if config.get("webhook_url") and not config.get("app_id") else "longconnection"
+        connection_mode = config.get("connection_mode", "longconnection")
         
         if connection_mode == "longconnection":
             if not config.get("app_id"):
                 errors.append("app_id is required for Long Connection mode")
             if not config.get("app_secret"):
                 errors.append("app_secret is required for Long Connection mode")
-            if not errors and not await self._verify_credentials(config):
-                errors.append("Failed to verify Feishu app credentials")
         elif connection_mode == "webhook":
             if not config.get("webhook_url"):
                 errors.append("webhook_url is required for Webhook mode")
-            if not errors:
-                webhook_error = await self._verify_webhook_endpoint(str(config.get("webhook_url", "")))
-                if webhook_error:
-                    errors.append(webhook_error)
-        else:
-            errors.append(f"Unsupported connection_mode: {connection_mode}")
+            token = config.get("verification_token")
+            if token is not None and not str(token).strip():
+                errors.append("verification_token must not be empty when provided")
+            encrypt_key = config.get("encrypt_key")
+            if encrypt_key is not None and not str(encrypt_key).strip():
+                errors.append("encrypt_key must not be empty when provided")
         
         return ChannelValidationResult(valid=len(errors) == 0, errors=errors)
     

@@ -1,7 +1,5 @@
 {
-  "_comment": "Example AtlasClaw configuration. This file stays valid JSON by using _comment fields instead of // comments.",
-  "_comment_base_path": "Optional reverse-proxy mount path for browser-visible URLs, e.g. /atlasclaw when Nginx publishes AtlasClaw under https://host/atlasclaw",
-  "base_path": "",
+  "_comment": "Example XuanWu configuration. This file stays valid JSON by using _comment fields instead of // comments.",
   "workspace": {
     "_comment": "Workspace configuration for runtime data and user sessions",
     "path": "./.xuanwu"
@@ -24,15 +22,8 @@
     "max_overflow": 10,
     "echo": false
   },
-  "providers_root": "../atlasclaw-providers/providers",
-
-  "skills_root": "../atlasclaw-providers/skills",
-  "channels_root": "../atlasclaw-providers/channels",
-  "skills": {
-    "_comment": "Built-in tool registration controls. tools_exclusive removes named built-in tools or groups at startup. allow_script_execution controls local high-risk file/exec built-ins only.",
-    "tools_exclusive": [],
-    "allow_script_execution": true
-  },
+  "skills_root": "./.xuanwu/skills",
+  "channels_root": "./.xuanwu/channels",
 
   "model": {
     "_comment": "Token pool configuration for multi-token LLM access. Set reasoning: true for models that support thinking/reasoning output.",
@@ -69,38 +60,6 @@
 
   "service_providers": {
     "_comment": "Enterprise system instances used by skills. Instance names like dev/prod are referenced at runtime.",
-
-    "smartcmp": {
-      "_comment_auth_types": "Supported auth_type values: cmp | cookie | credential | user_token. Choose ONE that matches your deployment.",
-
-      "default": {
-        "_comment": "auth_type=cmp — Embedded in CMP (Nginx reverse-proxy). AtlasClaw reads CloudChef-Authenticate cookie from the browser automatically. No static credentials needed.",
-        "base_url": "https://172.16.0.81",
-        "auth_type": "cmp"
-      },
-
-      "_example_cookie": {
-        "_comment": "auth_type=cookie — Use a pre-obtained static cookie token for server-to-server or testing.",
-        "base_url": "https://cmp.example.com",
-        "auth_type": "cookie",
-        "cookie": "${CMP_COOKIE}"
-      },
-
-      "_example_credential": {
-        "_comment": "auth_type=credential — Username/password login. The system will call CMP login API to obtain a session.",
-        "base_url": "https://cmp.example.com",
-        "auth_type": "credential",
-        "username": "${CMP_USERNAME}",
-        "password": "${CMP_PASSWORD}"
-      },
-
-      "_example_user_token": {
-        "_comment": "auth_type=user_token — Each user configures their own API token via the AtlasClaw UI. Only base_url is needed here.",
-        "base_url": "${CMP_URL}",
-        "auth_type": "user_token"
-      }
-    },
-
     "jira": {
       "dev": {
         "_comment": "Jira supports either password or token. Keep only the one you actually use.",

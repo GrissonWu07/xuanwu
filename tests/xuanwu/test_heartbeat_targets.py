@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from app.atlasclaw.heartbeat.models import HeartbeatTargetDescriptor, HeartbeatTargetType
-from app.atlasclaw.heartbeat.targets import HeartbeatTargetResolver
+from app.xuanwu.heartbeat.models import HeartbeatTargetDescriptor, HeartbeatTargetType
+from app.xuanwu.heartbeat.targets import HeartbeatTargetResolver
 
 
 def test_group_chat_target_resolves_summary_only() -> None:

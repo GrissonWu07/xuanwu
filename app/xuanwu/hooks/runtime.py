@@ -7,7 +7,7 @@ import logging
 from typing import Any, Awaitable, Callable, Optional
 from uuid import uuid4
 
-from app.atlasclaw.hooks.runtime_models import (
+from app.xuanwu.hooks.runtime_models import (
     HookDecision,
     HookEventType,
     HookEventEnvelope,
@@ -15,13 +15,13 @@ from app.atlasclaw.hooks.runtime_models import (
     HookWriteMemoryRequest,
     PendingHookItem,
 )
-from app.atlasclaw.hooks.runtime_script import (
+from app.xuanwu.hooks.runtime_script import (
     HookScriptExecutionError,
     HookScriptHandlerDefinition,
     HookScriptRunner,
 )
-from app.atlasclaw.hooks.runtime_sinks import ContextSink, MemorySink
-from app.atlasclaw.hooks.runtime_store import HookStateStore
+from app.xuanwu.hooks.runtime_sinks import ContextSink, MemorySink
+from app.xuanwu.hooks.runtime_store import HookStateStore
 
 
 HookHandler = Callable[[HookEventEnvelope, "HookRuntimeContext"], Awaitable[None]]

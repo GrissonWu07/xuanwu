@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.atlasclaw.heartbeat.models import (
+from app.xuanwu.heartbeat.models import (
     HeartbeatJobDefinition,
     HeartbeatJobStateSnapshot,
     HeartbeatJobType,
 )
-from app.atlasclaw.heartbeat.store import HeartbeatStateStore
+from app.xuanwu.heartbeat.store import HeartbeatStateStore
 
 
 def test_store_persists_jobs_and_state(tmp_path: Path) -> None:

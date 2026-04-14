@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from app.atlasclaw.hooks.runtime_models import (
+from app.xuanwu.hooks.runtime_models import (
     HookEventEnvelope,
     HookEventType,
     HookScriptAction,

@@ -9,15 +9,15 @@ from pathlib import Path
 
 import pytest
 
-from app.atlasclaw.hooks.runtime import HookRuntime, HookRuntimeContext
-from app.atlasclaw.hooks.runtime_models import HookEventEnvelope, HookEventType
-from app.atlasclaw.hooks.runtime_script import (
+from app.xuanwu.hooks.runtime import HookRuntime, HookRuntimeContext
+from app.xuanwu.hooks.runtime_models import HookEventEnvelope, HookEventType
+from app.xuanwu.hooks.runtime_script import (
     HookScriptExecutionError,
     HookScriptHandlerDefinition,
     HookScriptRunner,
 )
-from app.atlasclaw.hooks.runtime_sinks import ContextSink, MemorySink
-from app.atlasclaw.hooks.runtime_store import HookStateStore
+from app.xuanwu.hooks.runtime_sinks import ContextSink, MemorySink
+from app.xuanwu.hooks.runtime_store import HookStateStore
 
 
 def _event() -> HookEventEnvelope:

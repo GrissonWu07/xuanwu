@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.atlasclaw.tools.web import openmeteo_weather_tool as weather_module
+from app.xuanwu.tools.web import openmeteo_weather_tool as weather_module
 
 
 @pytest.mark.asyncio
@@ -151,77 +151,3 @@ async def test_openmeteo_weather_tool_validates_target_date_format() -> None:
 
     assert result["is_error"] is True
     assert "YYYY-MM-DD" in result["content"][0]["text"]
-
-
-@pytest.mark.asyncio
-async def test_openmeteo_weather_tool_prefers_exact_admin_match_over_first_geocoding_hit(
-    monkeypatch,
-) -> None:
-    observed_forecast_params: dict = {}
-    observed_geocoding_queries: list[dict] = []
-
-    async def _fake_request_json(*, url: str, params: dict, timeout_seconds: float = 12.0):
-        _ = timeout_seconds
-        if "geocoding-api" in url:
-            observed_geocoding_queries.append(dict(params))
-            if params.get("name") == "北京":
-                return {
-                    "results": [
-                        {
-                            "name": "北京",
-                            "country": "中国",
-                            "country_code": "CN",
-                            "admin1": "重庆市",
-                            "latitude": 29.4316,
-                            "longitude": 106.9123,
-                            "population": 5000,
-                        }
-                    ]
-                }
-            return {
-                "results": [
-                    {
-                        "name": "北京市",
-                        "country": "中国",
-                        "country_code": "CN",
-                        "admin1": "北京市",
-                        "latitude": 39.9042,
-                        "longitude": 116.4074,
-                        "population": 21893095,
-                    }
-                ]
-            }
-        observed_forecast_params.update(params)
-        return {
-            "daily": {
-                "time": ["2026-04-15"],
-                "weather_code": [3],
-                "temperature_2m_max": [26.0],
-                "temperature_2m_min": [14.0],
-                "precipitation_sum": [0.0],
-                "precipitation_probability_max": [15],
-                "wind_speed_10m_max": [12.0],
-            },
-            "daily_units": {
-                "temperature_2m_max": "°C",
-                "precipitation_sum": "mm",
-                "precipitation_probability_max": "%",
-                "wind_speed_10m_max": "km/h",
-            },
-        }
-
-    monkeypatch.setattr(weather_module, "_request_json", _fake_request_json)
-
-    result = await weather_module.openmeteo_weather_tool(
-        ctx=SimpleNamespace(),
-        location="北京",
-        days=1,
-    )
-
-    assert result["is_error"] is False
-    assert [query["name"] for query in observed_geocoding_queries] == ["北京", "北京市"]
-    assert all(query["count"] == 8 for query in observed_geocoding_queries)
-    assert observed_forecast_params["latitude"] == 39.9042
-    assert observed_forecast_params["longitude"] == 116.4074
-    assert result["details"]["resolved_location"]["admin1"] == "北京市"
-    assert result["details"]["resolved_location"]["name"] == "北京市"

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from app.atlasclaw.agent.tool_gate_models import (
+from app.xuanwu.agent.tool_gate_models import (
     CapabilityMatchResult,
     ToolGateDecision,
     ToolPolicyMode,

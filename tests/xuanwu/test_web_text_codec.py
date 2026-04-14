@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from app.atlasclaw.tools.web.text_codec import decode_http_text
+from app.xuanwu.tools.web.text_codec import decode_http_text
 
 
 def test_decode_http_text_supports_gb18030_declared_encoding() -> None:

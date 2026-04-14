@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from app.atlasclaw.core.config_schema import AtlasClawConfig
-from app.atlasclaw.heartbeat.models import (
+from app.xuanwu.core.config_schema import XuanWuConfig
+from app.xuanwu.heartbeat.models import (
     HeartbeatJobStateSnapshot,
     HeartbeatJobType,
     HeartbeatTargetType,
@@ -10,7 +10,7 @@ from app.atlasclaw.heartbeat.models import (
 
 
 def test_atlasclaw_config_parses_heartbeat_sections() -> None:
-    config = AtlasClawConfig.model_validate(
+    config = XuanWuConfig.model_validate(
         {
             "heartbeat": {
                 "enabled": True,
@@ -63,7 +63,7 @@ def test_heartbeat_state_snapshot_round_trips() -> None:
 
 
 def test_target_descriptor_parses_thread_target() -> None:
-    config = AtlasClawConfig.model_validate(
+    config = XuanWuConfig.model_validate(
         {
             "heartbeat": {
                 "enabled": True,

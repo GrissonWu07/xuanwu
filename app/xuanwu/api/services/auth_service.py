@@ -9,11 +9,6 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from ...auth.jwt_token import issue_atlas_token, verify_atlas_token
 from ...auth.models import AuthenticationError
-from ...core.base_path import (
-    build_base_path_url,
-    cookie_path_for_base_path,
-    normalize_base_path,
-)
 from ...session.context import ChatType as SessionChatType
 from ...session.context import SessionKey, SessionScope
 from ..deps_context import (
@@ -24,30 +19,6 @@ from ..deps_context import (
     resolve_workspace_path,
 )
 from ..schemas import LocalLoginRequest
-
-
-def _get_base_path(request: Request) -> str:
-    config = getattr(request.app.state, "config", None)
-    return normalize_base_path(getattr(config, "base_path", ""))
-
-
-def _build_app_url(request: Request, path: str) -> str:
-    return build_base_path_url(_get_base_path(request), path)
-
-
-def _build_external_app_url(request: Request, path: str) -> str:
-    return f"{str(request.base_url).rstrip('/')}{_build_app_url(request, path)}"
-
-
-def _cookie_path(request: Request) -> str:
-    return cookie_path_for_base_path(_get_base_path(request))
-
-
-def _delete_cookie(response: Response, request: Request, key: str) -> None:
-    path = _cookie_path(request)
-    response.delete_cookie(key, path=path)
-    if path != "/":
-        response.delete_cookie(key, path="/")
 
 
 def get_auth_config_or_400(request: Request, providers: tuple[str, ...]):
@@ -177,7 +148,7 @@ async def perform_local_login(request: Request, body: LocalLoginRequest) -> Resp
     response.set_cookie(
         key="xuanwu_session",
         value=session_key_str,
-        path=_cookie_path(request),
+        path="/",
         httponly=True,
         secure=secure_cookie,
         samesite="lax",
@@ -185,7 +156,7 @@ async def perform_local_login(request: Request, body: LocalLoginRequest) -> Resp
     response.set_cookie(
         key=jwt_cfg.cookie_name,
         value=atlas_token,
-        path=_cookie_path(request),
+        path="/",
         httponly=True,
         secure=secure_cookie,
         samesite="lax",
@@ -205,7 +176,6 @@ async def begin_sso_login(request: Request) -> Response:
     response.set_cookie(
         key="sso_state",
         value=state,
-        path=_cookie_path(request),
         httponly=True,
         secure=secure_cookie,
         samesite="lax",
@@ -214,7 +184,6 @@ async def begin_sso_login(request: Request) -> Response:
     response.set_cookie(
         key="pkce_verifier",
         value=code_verifier,
-        path=_cookie_path(request),
         httponly=True,
         secure=secure_cookie,
         samesite="lax",
@@ -302,18 +271,12 @@ async def complete_sso_login(
         secret_key=jwt_cfg.secret_key,
         expires_minutes=jwt_cfg.expires_minutes,
         issuer=jwt_cfg.issuer,
-        additional_claims={
-            "display_name": session.display_name,
-            "external_subject": auth_result.subject,
-            "provider_subject": f"{auth_config.provider.lower()}:{auth_result.subject}",
-        },
     )
 
-    response = RedirectResponse(url=_build_app_url(request, "/"), status_code=302)
+    response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(
         key="xuanwu_session",
         value=session_key_str,
-        path=_cookie_path(request),
         httponly=True,
         secure=secure_cookie,
         samesite="lax",
@@ -321,7 +284,6 @@ async def complete_sso_login(
     response.set_cookie(
         key=jwt_cfg.cookie_name,
         value=atlas_token,
-        path=_cookie_path(request),
         httponly=True,
         secure=secure_cookie,
         samesite="lax",
@@ -330,7 +292,6 @@ async def complete_sso_login(
         response.set_cookie(
             key="CloudChef-Authenticate",
             value=auth_result.raw_token,
-            path=_cookie_path(request),
             httponly=True,
             secure=secure_cookie,
             samesite="lax",
@@ -339,14 +300,13 @@ async def complete_sso_login(
         response.set_cookie(
             key="oidc_id_token",
             value=auth_result.id_token,
-            path=_cookie_path(request),
             httponly=True,
             secure=secure_cookie,
             samesite="lax",
         )
 
-    _delete_cookie(response, request, "sso_state")
-    _delete_cookie(response, request, "pkce_verifier")
+    response.delete_cookie("sso_state")
+    response.delete_cookie("pkce_verifier")
     return response
 
 
@@ -355,46 +315,16 @@ async def load_profile_snapshot(
     user_id: str,
     auth_type: str = "",
     workspace_path: str = "",
-    external_subject: str = "",
 ) -> dict[str, Any]:
     from ...auth.shadow_store import ShadowUserStore
     from ...db.database import get_db_manager
     from ...db.orm.user import UserService
 
-    async def _resolve_federated_subject() -> str:
-        normalized_auth_type = str(auth_type or "").strip().lower()
-        if normalized_auth_type == "local":
-            return ""
-
-        normalized_external_subject = str(external_subject or "").strip()
-        if normalized_external_subject:
-            return normalized_external_subject
-
-        if not workspace_path:
-            return ""
-
-        try:
-            shadow_store = ShadowUserStore(workspace_path=workspace_path)
-            shadow_user = await shadow_store.get_by_id(user_id)
-        except Exception:
-            return ""
-
-        if not shadow_user:
-            return ""
-
-        return str(shadow_user.subject or "").strip()
-
-    async def _load_db_profile(username: str) -> dict[str, Any]:
-        normalized_username = str(username or "").strip()
-        if not normalized_username:
-            return {}
-
-        try:
-            db_manager = get_db_manager()
-            async with db_manager.get_session() as db_session:
-                user = await UserService.get_by_username(db_session, normalized_username)
-                if not user:
-                    return {}
+    try:
+        db_manager = get_db_manager()
+        async with db_manager.get_session() as db_session:
+            user = await UserService.get_by_username(db_session, user_id)
+            if user:
                 return {
                     "id": user.id,
                     "username": user.username,
@@ -409,18 +339,8 @@ async def load_profile_snapshot(
                     "last_login_at": user.last_login_at,
                     "updated_at": user.updated_at,
                 }
-        except Exception:
-            return {}
-
-    db_profile = await _load_db_profile(user_id)
-    if db_profile:
-        return db_profile
-
-    federated_subject = await _resolve_federated_subject()
-    if federated_subject and federated_subject != str(user_id or "").strip():
-        db_profile = await _load_db_profile(federated_subject)
-        if db_profile:
-            return db_profile
+    except Exception:
+        pass
 
     normalized_auth_type = str(auth_type or "").strip().lower()
     if not workspace_path or normalized_auth_type == "local":
@@ -457,9 +377,6 @@ async def load_profile_snapshot(
 
 async def get_current_user_payload(request: Request) -> dict[str, Any]:
     from ...auth.config import AuthConfig
-    from ...auth.guards import resolve_authorization_context
-    from ...auth.models import UserInfo
-    from ...db.database import get_db_manager
 
     auth_config: AuthConfig = getattr(request.app.state.config, "auth", None)
     if not auth_config:
@@ -475,22 +392,6 @@ async def get_current_user_payload(request: Request) -> dict[str, Any]:
             "display_name": "Anonymous",
             "provider": "none",
         }
-
-    # CMP mode: user identity already resolved by middleware from cookies
-    if auth_config.provider == "cmp":
-        user_info = getattr(request.state, "user_info", None)
-        if user_info and user_info.user_id != "anonymous":
-            return {
-                "user_id": user_info.user_id,
-                "display_name": user_info.display_name,
-                "provider": "cmp",
-                "auth_type": "cmp",
-                "tenant_id": user_info.tenant_id,
-            }
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
 
     jwt_cfg = auth_config.jwt.expanded()
     token = extract_atlas_token_from_request(
@@ -548,52 +449,21 @@ async def get_current_user_payload(request: Request) -> dict[str, Any]:
         user_id=jwt_user_id,
         auth_type=str(jwt_payload.get("auth_type", "")),
         workspace_path=resolve_workspace_path(request, ctx=ctx),
-        external_subject=str(jwt_payload.get("external_subject", "")),
     )
-
-    effective_permissions: dict[str, Any] = {}
-    effective_role_identifiers = roles
-    effective_is_admin = bool(jwt_payload.get("is_admin", jwt_payload.get("admin", False)))
-
-    try:
-        db_manager = get_db_manager()
-        async with db_manager.get_session() as db_session:
-            authz = await resolve_authorization_context(
-                db_session,
-                UserInfo(
-                    user_id=jwt_user_id,
-                    display_name=profile_overrides.get("display_name", session.display_name or jwt_user_id),
-                    roles=roles,
-                    provider_subject=str(jwt_payload.get("provider_subject", "")),
-                    auth_type=str(jwt_payload.get("auth_type", "")),
-                    extra={
-                        "is_admin": effective_is_admin,
-                        "external_subject": str(jwt_payload.get("external_subject", "")),
-                    },
-                ),
-            )
-        effective_permissions = authz.permissions
-        effective_role_identifiers = authz.role_identifiers
-        effective_is_admin = authz.is_admin
-    except Exception:
-        # Fall back to the token payload if the DB-backed RBAC snapshot cannot be resolved.
-        effective_permissions = {}
 
     return {
         "user_id": jwt_user_id,
         "username": profile_overrides.get("username", jwt_user_id),
         "session_key": session.session_key,
         "auth_type": str(jwt_payload.get("auth_type", "")),
-        "roles": effective_role_identifiers,
-        "role_identifiers": effective_role_identifiers,
+        "roles": roles,
         "display_name": profile_overrides.get("display_name", session.display_name or jwt_user_id),
         "email": profile_overrides.get("email"),
         "avatar_url": profile_overrides.get("avatar_url"),
         "is_active": profile_overrides.get("is_active", True),
         "created_at": profile_overrides.get("created_at"),
         "last_login_at": profile_overrides.get("last_login_at"),
-        "is_admin": effective_is_admin,
-        "permissions": effective_permissions,
+        "is_admin": bool(jwt_payload.get("is_admin", jwt_payload.get("admin", False))),
         "login_time": jwt_payload.get("login_time", ""),
         "metadata": session.to_dict(),
     }
@@ -612,7 +482,7 @@ async def logout_user(request: Request, redirect: bool = True) -> Response:
     if auth_config and auth_config.provider == "oidc" and redirect:
         oidc_config = auth_config.oidc.expanded()
         if oidc_config.end_session_endpoint:
-            post_logout_uri = _build_external_app_url(request, "/api/auth/login")
+            post_logout_uri = str(request.base_url).rstrip("/") + "/api/auth/login"
             id_token_hint = request.cookies.get("oidc_id_token", "")
             logout_params = (
                 f"?post_logout_redirect_uri={post_logout_uri}"
@@ -627,12 +497,12 @@ async def logout_user(request: Request, redirect: bool = True) -> Response:
     else:
         response = JSONResponse(content={"status": "logged_out"})
 
-    _delete_cookie(response, request, "atlasclaw_session")
+    response.delete_cookie("xuanwu_session")
     if auth_config and getattr(auth_config, "jwt", None):
-        _delete_cookie(response, request, auth_config.jwt.expanded().cookie_name)
-    _delete_cookie(response, request, "AtlasClaw-Authenticate")
-    _delete_cookie(response, request, "CloudChef-Authenticate")
-    _delete_cookie(response, request, "oidc_id_token")
-    _delete_cookie(response, request, "sso_state")
-    _delete_cookie(response, request, "pkce_verifier")
+        response.delete_cookie(auth_config.jwt.expanded().cookie_name)
+    response.delete_cookie("XuanWu-Authenticate")
+    response.delete_cookie("CloudChef-Authenticate")
+    response.delete_cookie("oidc_id_token")
+    response.delete_cookie("sso_state")
+    response.delete_cookie("pkce_verifier")
     return response

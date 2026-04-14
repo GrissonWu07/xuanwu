@@ -11,12 +11,12 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .handler import ChannelHandler
-from .models import ChannelConnection, ConnectionStatus, InboundMessage, OutboundMessage
+from .models import ChannelConnection, InboundMessage, OutboundMessage
 from .registry import ChannelRegistry
-from app.atlasclaw.auth.models import UserInfo
-from app.atlasclaw.core.user_provider_bindings import build_provider_binding_runtime_context
-from app.atlasclaw.db.orm.channel_config import ChannelConfigService
-from app.atlasclaw.session.context import ChatType, SessionKey, SessionScope
+from app.xuanwu.auth.models import UserInfo
+from app.xuanwu.db.orm.channel_config import ChannelConfigService
+from app.xuanwu.session.context import ChatType, SessionKey, SessionScope
+from app.xuanwu.subagents.executor import create_subagent_executor
 
 if TYPE_CHECKING:
     from app.xuanwu.agent.runner import AgentRunner
@@ -37,30 +37,10 @@ class ChannelManager:
         """
         self._workspace_path = workspace_path
         self._active_connections: Dict[str, ChannelHandler] = {}
-        self._runtime_status_by_connection_id: Dict[str, ConnectionStatus] = {}
         self._agent_runner: Optional["AgentRunner"] = None
         self._session_manager_router: Optional["SessionManagerRouter"] = None
         self._subagent_runtime: Optional[Any] = None
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None
-
-    def _set_connection_runtime_status(
-        self,
-        connection_id: str,
-        status: ConnectionStatus,
-    ) -> None:
-        """Persist the latest known runtime status for a connection."""
-        self._runtime_status_by_connection_id[connection_id] = status
-
-    @staticmethod
-    def _map_runtime_status(status: ConnectionStatus) -> str:
-        """Convert enum runtime state to API response text."""
-        status_map = {
-            ConnectionStatus.CONNECTED: "connected",
-            ConnectionStatus.CONNECTING: "connecting",
-            ConnectionStatus.DISCONNECTED: "disconnected",
-            ConnectionStatus.ERROR: "error",
-        }
-        return status_map.get(status, "disconnected")
     
     def set_agent_runner(self, agent_runner: "AgentRunner") -> None:
         """Set the agent runner for processing messages.
@@ -79,21 +59,9 @@ class ChannelManager:
         """Set the per-user session manager router used by channel traffic."""
         self._session_manager_router = session_manager_router
 
-    def _build_provider_runtime_extra(
-        self,
-        user_id: str,
-        handler_config: Optional[Dict[str, Any]],
-    ) -> Dict[str, Any]:
-        """Build provider runtime context for channel-originated agent turns."""
-        binding_value = ""
-        if isinstance(handler_config, dict):
-            binding_value = str(handler_config.get("provider_binding", "") or "").strip()
-
-        return build_provider_binding_runtime_context(
-            user_id,
-            binding_value,
-            workspace_path=str(Path(self._workspace_path).resolve()),
-        )
+    def set_subagent_runtime(self, subagent_runtime: Any) -> None:
+        """Set subagent runtime manager for channel-originated runs."""
+        self._subagent_runtime = subagent_runtime
 
     async def initialize_connection(
         self,
@@ -114,8 +82,6 @@ class ChannelManager:
         Returns:
             True if initialized successfully
         """
-        self._set_connection_runtime_status(connection_id, ConnectionStatus.CONNECTING)
-
         try:
             from app.xuanwu.db import get_db_manager
 
@@ -124,7 +90,6 @@ class ChannelManager:
                 channel = await ChannelConfigService.get_by_id(session, connection_id)
                 if not channel or channel.user_id != user_id or channel.type != channel_type:
                     logger.error(f"Connection not found: {user_id}/{channel_type}/{connection_id}")
-                    self._set_connection_runtime_status(connection_id, ConnectionStatus.ERROR)
                     return False
 
                 connection_config = ChannelConfigService.to_channel_config(channel)
@@ -133,19 +98,10 @@ class ChannelManager:
             handler_class = ChannelRegistry.get(channel_type)
             if not handler_class:
                 logger.error(f"Channel type not found: {channel_type}")
-                self._set_connection_runtime_status(connection_id, ConnectionStatus.ERROR)
                 return False
 
             # Create instance
             instance_key = f"{user_id}:{channel_type}:{connection_id}"
-
-            try:
-                self._build_provider_runtime_extra(user_id, connection_config.get("config"))
-            except ValueError as exc:
-                logger.error("Channel provider binding is invalid for %s: %s", instance_key, exc)
-                self._set_connection_runtime_status(connection_id, ConnectionStatus.ERROR)
-                return False
-
             handler = ChannelRegistry.create_instance(
                 instance_key,
                 channel_type,
@@ -154,13 +110,11 @@ class ChannelManager:
 
             if not handler:
                 logger.error(f"Failed to create handler instance: {instance_key}")
-                self._set_connection_runtime_status(connection_id, ConnectionStatus.ERROR)
                 return False
 
             # Setup handler
             if not await handler.setup(connection_config["config"]):
                 logger.error(f"Handler setup failed: {instance_key}")
-                self._set_connection_runtime_status(connection_id, ConnectionStatus.ERROR)
                 return False
 
             # Set message callback for long-connection mode
@@ -172,10 +126,6 @@ class ChannelManager:
             # Start handler (for long-connection, this establishes the connection)
             if not await handler.start(None):  # TODO: pass proper context
                 logger.error(f"Handler start failed: {instance_key}")
-                failure_status = handler.get_status()
-                if failure_status == ConnectionStatus.DISCONNECTED:
-                    failure_status = ConnectionStatus.ERROR
-                self._set_connection_runtime_status(connection_id, failure_status)
                 return False
 
             # For long-connection handlers, also call connect()
@@ -183,10 +133,6 @@ class ChannelManager:
                 if not await handler.connect():
                     logger.error(f"Long connection failed: {instance_key}")
                     await handler.stop()
-                    failure_status = handler.get_status()
-                    if failure_status == ConnectionStatus.DISCONNECTED:
-                        failure_status = ConnectionStatus.ERROR
-                    self._set_connection_runtime_status(connection_id, failure_status)
                     return False
                 logger.info(f"Long connection established: {instance_key}")
 
@@ -200,14 +146,12 @@ class ChannelManager:
                 enabled=channel.is_active,
                 is_default=channel.is_default,
             ))
-            self._set_connection_runtime_status(connection_id, handler.get_status())
 
             logger.info(f"Channel connection initialized: {instance_key}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to initialize connection: {e}")
-            self._set_connection_runtime_status(connection_id, ConnectionStatus.ERROR)
             return False
 
     def _on_message_received(
@@ -270,8 +214,7 @@ class ChannelManager:
                 )
                 return
             
-            from app.atlasclaw.core.deps import SkillDeps
-            from app.atlasclaw.core.trace import enrich_trace_metadata
+            from app.xuanwu.core.deps import SkillDeps
 
             user_info = UserInfo(user_id=user_id, display_name=user_id.capitalize())
             session_key = self._build_channel_session_key(
@@ -285,7 +228,6 @@ class ChannelManager:
                 if self._session_manager_router is not None
                 else None
             )
-            provider_runtime_extra = self._build_provider_runtime_extra(user_id, getattr(handler, "config", {}))
 
             deps = SkillDeps(
                 user_info=user_info,
@@ -293,16 +235,12 @@ class ChannelManager:
                 session_key=session_key,
                 channel=channel_type,
                 session_manager=scoped_session_manager,
-                extra=enrich_trace_metadata(
-                    session_key,
-                    extra={
-                        "channel_connection_id": connection_id,
-                        "external_sender_id": message.sender_id,
-                        "external_chat_id": message.chat_id,
-                        "external_chat_type": self._resolve_chat_type(message).value,
-                        **provider_runtime_extra,
-                    },
-                ),
+                extra={
+                    "channel_connection_id": connection_id,
+                    "external_sender_id": message.sender_id,
+                    "external_chat_id": message.chat_id,
+                    "external_chat_type": self._resolve_chat_type(message).value,
+                },
             )
             if self._subagent_runtime is not None and scoped_session_manager is not None:
                 deps.extra["subagent_runtime"] = self._subagent_runtime
@@ -455,7 +393,6 @@ class ChannelManager:
 
             if not handler:
                 logger.warning(f"Connection not active: {instance_key}")
-                self._set_connection_runtime_status(connection_id, ConnectionStatus.DISCONNECTED)
                 return False
 
             # For long-connection handlers, disconnect first
@@ -465,14 +402,12 @@ class ChannelManager:
 
             await handler.stop()
             del self._active_connections[instance_key]
-            self._set_connection_runtime_status(connection_id, ConnectionStatus.DISCONNECTED)
 
             logger.info(f"Channel connection stopped: {instance_key}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to stop connection: {e}")
-            self._set_connection_runtime_status(connection_id, ConnectionStatus.ERROR)
             return False
 
     async def route_inbound_message(
@@ -752,7 +687,6 @@ class ChannelManager:
                 return False
 
         # Step 2: Initialize connection in background (async, don't block API response)
-        self._set_connection_runtime_status(connection_id, ConnectionStatus.CONNECTING)
         asyncio.create_task(self._background_initialize(user_id, channel_type, connection_id))
         return True
 
@@ -804,8 +738,6 @@ class ChannelManager:
 
         async with get_db_manager().get_session() as session:
             channel = await ChannelConfigService.update_status(session, connection_id, False)
-            if channel is not None:
-                self._set_connection_runtime_status(connection_id, ConnectionStatus.DISCONNECTED)
             return channel is not None
 
     def get_connection_runtime_status(
@@ -823,30 +755,29 @@ class ChannelManager:
         Returns:
             Runtime status string: "connected", "disconnected", "connecting", or "error"
         """
+        from .models import ConnectionStatus
+
         # Search for handler by connection_id (last part of instance_key)
         handler = None
         for key, h in self._active_connections.items():
             if key.endswith(f":{connection_id}"):
                 handler = h
                 break
-
+        
         if not handler:
-            cached_status = self._runtime_status_by_connection_id.get(
-                connection_id,
-                ConnectionStatus.DISCONNECTED,
-            )
-            return self._map_runtime_status(cached_status)
-
+            return "disconnected"
+        
         try:
             status = handler.get_status()
-            self._set_connection_runtime_status(connection_id, status)
-            return self._map_runtime_status(status)
+            status_map = {
+                ConnectionStatus.CONNECTED: "connected",
+                ConnectionStatus.CONNECTING: "connecting",
+                ConnectionStatus.DISCONNECTED: "disconnected",
+                ConnectionStatus.ERROR: "error",
+            }
+            return status_map.get(status, "disconnected")
         except Exception:
-            cached_status = self._runtime_status_by_connection_id.get(
-                connection_id,
-                ConnectionStatus.DISCONNECTED,
-            )
-            return self._map_runtime_status(cached_status)
+            return "disconnected"
 
     def list_active_connection_descriptors(self) -> list[dict[str, Any]]:
         """Return lightweight descriptors for all active connections."""

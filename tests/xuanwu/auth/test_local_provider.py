@@ -30,6 +30,7 @@ async def local_db(tmp_path: Path):
                 display_name="Administrator",
                 roles={"admin": True},
                 auth_type="local",
+                is_admin=True,
                 is_active=True,
             ),
         )

@@ -9,9 +9,8 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from app.atlasclaw.core.token_pool import TokenEntry
-from app.atlasclaw.core.trace import create_traced_http_client
-from app.atlasclaw.db.database import DatabaseConfig, get_db_manager
+from app.xuanwu.core.token_pool import TokenEntry
+from app.xuanwu.db.database import DatabaseConfig, get_db_manager
 
 
 def derive_provider_namespace(provider_dir_name: str) -> str:
@@ -103,21 +102,13 @@ def create_pydantic_model(token: TokenEntry):
         from pydantic_ai.models.anthropic import AnthropicModel
         from pydantic_ai.providers.anthropic import AnthropicProvider
 
-        provider = AnthropicProvider(
-            api_key=token.api_key,
-            base_url=token.base_url,
-            http_client=create_traced_http_client(token.provider or "anthropic"),
-        )
+        provider = AnthropicProvider(api_key=token.api_key, base_url=token.base_url)
         return AnthropicModel(token.model, provider=provider)
 
     from pydantic_ai.models.openai import OpenAIChatModel, OpenAIModelProfile
     from pydantic_ai.providers.openai import OpenAIProvider
 
-    provider = OpenAIProvider(
-        api_key=token.api_key,
-        base_url=token.base_url,
-        http_client=create_traced_http_client(token.provider or "openai"),
-    )
+    provider = OpenAIProvider(api_key=token.api_key, base_url=token.base_url)
     # Use reasoning_content as the OpenAI-compatible thinking field when available.
     # For models/providers that do not emit it, this remains a no-op.
     profile = OpenAIModelProfile(openai_chat_thinking_field="reasoning_content")
@@ -326,6 +317,7 @@ async def ensure_default_local_admin(config) -> None:
                 display_name="Administrator",
                 roles={"admin": True},
                 auth_type="local",
+                is_admin=True,
                 is_active=True,
             ),
         )

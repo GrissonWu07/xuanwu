@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from app.atlasclaw.core.config_schema import AtlasClawConfig
+from app.xuanwu.core.config_schema import XuanWuConfig
 
 
 def test_hooks_runtime_config_parses_script_handlers() -> None:
-    config = AtlasClawConfig.model_validate(
+    config = XuanWuConfig.model_validate(
         {
             "hooks_runtime": {
                 "script_handlers": [

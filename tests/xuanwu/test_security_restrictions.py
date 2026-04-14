@@ -66,23 +66,26 @@ async def test_read_write_exec_are_restricted_to_user_work_dir(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_read_tool_allows_registered_skill_paths(tmp_path):
+async def test_runtime_tools_use_scoped_work_dir_override_when_present(tmp_path):
     ctx = _build_ctx(tmp_path)
-    skill_root = tmp_path / "external-provider" / "skills" / "approval"
-    skill_root.mkdir(parents=True, exist_ok=True)
-    skill_file = skill_root / "SKILL.md"
-    skill_file.write_text("# approval\n", encoding="utf-8")
-    ctx.deps.extra["md_skills_snapshot"] = [
-        {
-            "name": "approval",
-            "qualified_name": "smartcmp:approval",
-            "file_path": str(skill_file),
-        }
-    ]
+    user_work_dir = ensure_user_work_dir(tmp_path, "u-sec")
+    scoped_work_dir = (
+        user_work_dir
+        / "attachments"
+        / "thread-123"
+        / "1711612555"
+        / "workspace"
+    )
+    scoped_work_dir.mkdir(parents=True, exist_ok=True)
+    ctx.deps.extra["work_dir"] = str(scoped_work_dir)
 
-    read_ok = await read_tool(ctx, str(skill_file))
-    assert read_ok["is_error"] is False
-    assert "# approval" in str(read_ok["content"])
+    write_ok = await write_tool(ctx, "note.txt", "hello")
+    assert write_ok["is_error"] is False
+    assert (scoped_work_dir / "note.txt").exists()
+
+    exec_ok = await exec_tool(ctx, "python -c \"print('ok')\"")
+    assert exec_ok["is_error"] is False
+    assert exec_ok["details"]["cwd"] == str(scoped_work_dir)
 
 
 @pytest.mark.asyncio

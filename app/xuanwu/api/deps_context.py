@@ -12,12 +12,12 @@ from ..agent.routing import AgentRouter
 from ..auth.models import UserInfo
 from ..core.deps import SkillDeps
 from ..core.security_guard import ensure_user_work_dir
-from ..core.trace import enrich_trace_metadata
 from ..memory.manager import MemoryManager
 from ..session.manager import SessionManager
 from ..session.queue import SessionQueue
 from ..session.router import SessionManagerRouter
 from ..skills.registry import SkillRegistry
+from ..subagents.executor import create_subagent_executor
 from ..hooks.runtime import HookRuntime
 from ..hooks.runtime_sinks import ContextSink, MemorySink
 from ..hooks.runtime_store import HookStateStore
@@ -146,26 +146,12 @@ def build_scoped_deps(
             user_id=user_info.user_id,
         )
 
-    tools_snapshot_builder = getattr(ctx.skill_registry, "tools_snapshot", None)
-    if callable(tools_snapshot_builder):
-        tools_snapshot = tools_snapshot_builder()
-    else:
-        tools_snapshot = ctx.skill_registry.snapshot()
-
-    tool_groups_builder = getattr(ctx.skill_registry, "tool_groups_snapshot", None)
-    if callable(tool_groups_builder):
-        tool_groups_snapshot = tool_groups_builder()
-    else:
-        tool_groups_snapshot = {}
-
     deps_extra = {
         "_service_provider_registry": ctx.service_provider_registry,
         "available_providers": ctx.available_providers,
         "provider_instances": ctx.provider_instances,
         "provider_config": provider_config or {},
-        "tools_snapshot": tools_snapshot,
-        "tools_snapshot_authoritative": False,
-        "tool_groups_snapshot": tool_groups_snapshot,
+        "tools_snapshot": ctx.skill_registry.snapshot(),
         "skills_snapshot": ctx.skill_registry.snapshot_builtins(),
         "md_skills_snapshot": ctx.skill_registry.md_snapshot(),
         "work_dir": str(
@@ -177,7 +163,6 @@ def build_scoped_deps(
     }
     if extra:
         deps_extra.update(extra)
-    deps_extra = enrich_trace_metadata(session_key, extra=deps_extra)
 
     subagent_runtime = ctx.subagent_runtime
     if subagent_runtime is not None and ctx.agent_runner is not None:

@@ -6,17 +6,17 @@ from urllib.parse import quote
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.atlasclaw.api.routes import APIContext, create_router, set_api_context
-from app.atlasclaw.auth.models import UserInfo
-from app.atlasclaw.hooks.runtime import HookRuntime, HookRuntimeContext
-from app.atlasclaw.hooks.runtime_builtin import RUNTIME_AUDIT_MODULE, register_builtin_hook_handlers
-from app.atlasclaw.hooks.runtime_models import HookEventType
-from app.atlasclaw.hooks.runtime_sinks import ContextSink, MemorySink
-from app.atlasclaw.hooks.runtime_store import HookStateStore
-from app.atlasclaw.session.manager import SessionManager
-from app.atlasclaw.session.queue import SessionQueue
-from app.atlasclaw.session.router import SessionManagerRouter
-from app.atlasclaw.skills.registry import SkillRegistry
+from app.xuanwu.api.routes import APIContext, create_router, set_api_context
+from app.xuanwu.auth.models import UserInfo
+from app.xuanwu.hooks.runtime import HookRuntime, HookRuntimeContext
+from app.xuanwu.hooks.runtime_builtin import RUNTIME_AUDIT_MODULE, register_builtin_hook_handlers
+from app.xuanwu.hooks.runtime_models import HookEventType
+from app.xuanwu.hooks.runtime_sinks import ContextSink, MemorySink
+from app.xuanwu.hooks.runtime_store import HookStateStore
+from app.xuanwu.session.manager import SessionManager
+from app.xuanwu.session.queue import SessionQueue
+from app.xuanwu.session.router import SessionManagerRouter
+from app.xuanwu.skills.registry import SkillRegistry
 
 
 def _build_client(tmp_path, user_id: str = "alice") -> TestClient:
@@ -62,7 +62,7 @@ def _build_client(tmp_path, user_id: str = "alice") -> TestClient:
 def test_hook_routes_list_events_and_pending(tmp_path):
     client = _build_client(tmp_path, user_id="alice")
 
-    from app.atlasclaw.api.deps_context import get_api_context
+    from app.xuanwu.api.deps_context import get_api_context
 
     runtime = get_api_context().hook_runtime
     assert runtime is not None
@@ -98,7 +98,7 @@ def test_hook_routes_list_events_and_pending(tmp_path):
 
 def test_hook_routes_confirm_and_reject_pending(tmp_path):
     client = _build_client(tmp_path, user_id="alice")
-    from app.atlasclaw.api.deps_context import get_api_context
+    from app.xuanwu.api.deps_context import get_api_context
     import asyncio
 
     runtime = get_api_context().hook_runtime

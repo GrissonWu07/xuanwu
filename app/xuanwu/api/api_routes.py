@@ -13,8 +13,6 @@ Note: Channel configuration is managed via /api/channels routes.
 
 from __future__ import annotations
 
-import json
-import logging
 import re
 from datetime import datetime
 from pathlib import Path
@@ -23,9 +21,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.atlasclaw.core.config import get_config
-from app.atlasclaw.db import get_db_session_dependency as get_db_session
-from app.atlasclaw.db.schemas import (
+from app.xuanwu.core.config import get_config
+from app.xuanwu.db import get_db_session_dependency as get_db_session
+from app.xuanwu.db.schemas import (
     AgentCreate,
     AgentUpdate,
     AgentResponse,
@@ -42,32 +40,17 @@ from app.atlasclaw.db.schemas import (
     UserUpdate,
     UserResponse,
     UserListResponse,
-    RoleCreate,
-    RoleUpdate,
-    RoleResponse,
-    RoleListResponse,
     ProfileUpdate,
     PasswordChange,
-    UserProviderSettingUpdate,
-    UserProviderSettingsResponse,
 )
-from app.atlasclaw.db.orm.agent_config import AgentConfigService
-from app.atlasclaw.db.orm.audit import AuditService
-from app.atlasclaw.db.orm.model_token_config import ModelTokenConfigService
-from app.atlasclaw.db.orm.role import RoleService, is_system_managed_builtin_role
-from app.atlasclaw.db.orm.service_provider_config import ServiceProviderConfigService
-from app.atlasclaw.db.orm.user import UserService, verify_password
-from app.atlasclaw.auth.guards import (
-    AuthorizationContext,
-    ensure_any_permission,
-    ensure_can_manage_permission_modules,
-    ensure_permission,
-    get_current_user,
-    get_authorization_context,
-    is_same_workspace_user,
-)
-from app.atlasclaw.auth.models import UserInfo
-from app.atlasclaw.api.service_provider_schemas import normalize_provider_config
+from app.xuanwu.auth.guards import get_current_user, require_admin
+from app.xuanwu.auth.models import UserInfo
+from app.xuanwu.db.orm.agent_config import AgentConfigService
+from app.xuanwu.db.orm.audit import AuditService
+from app.xuanwu.db.orm.model_token_config import ModelTokenConfigService
+from app.xuanwu.db.orm.service_provider_config import ServiceProviderConfigService
+from app.xuanwu.db.orm.user import UserService, verify_password
+
 from .services.auth_service import load_profile_snapshot
 from .model_config_routes import router as model_config_router
 from .provider_info_routes import router as provider_info_router
@@ -79,310 +62,10 @@ ALLOWED_AVATAR_CONTENT_TYPES = {
     "image/gif": ".gif",
 }
 MAX_AVATAR_BYTES = 2 * 1024 * 1024
-ROLE_MANAGEMENT_ACCESS_PERMISSIONS = (
-    "roles.view",
-    "roles.create",
-    "roles.edit",
-    "roles.delete",
-    "rbac.manage_permissions",
-    "skills.manage_permissions",
-    "channels.manage_permissions",
-    "tokens.manage_permissions",
-    "agent_configs.manage_permissions",
-    "provider_configs.manage_permissions",
-    "model_configs.manage_permissions",
-    "users.manage_permissions",
-)
-ROLE_CATALOG_ACCESS_PERMISSIONS = ROLE_MANAGEMENT_ACCESS_PERMISSIONS + (
-    "users.assign_roles",
-)
-USER_MANAGEMENT_ACCESS_PERMISSIONS = (
-    "users.view",
-    "users.create",
-    "users.edit",
-    "users.delete",
-    "users.reset_password",
-    "users.assign_roles",
-)
-SENSITIVE_ROLE_IDENTIFIERS = frozenset({"admin"})
-NON_ADMIN_ASSIGNABLE_PERMISSION_PATHS = frozenset({
-    "skills.module_permissions.view",
-    "channels.view",
-    "tokens.view",
-    "agent_configs.view",
-    "provider_configs.view",
-    "model_configs.view",
-    "users.view",
-    "roles.view",
-})
 
 
 def _is_local_auth_type(auth_type: str) -> bool:
     return str(auth_type or "").strip().lower() == "local"
-
-
-def _serialize_role_for_audit(role: object) -> dict[str, object]:
-    """Build a compact role payload for audit logging."""
-    return AuditService.sanitize_user_data({
-        "id": getattr(role, "id", None),
-        "name": getattr(role, "name", None),
-        "identifier": getattr(role, "identifier", None),
-        "description": getattr(role, "description", None),
-        "permissions": getattr(role, "permissions", None),
-        "is_builtin": getattr(role, "is_builtin", None),
-        "is_active": getattr(role, "is_active", None),
-    })
-
-
-def _has_truthy_role_assignments(raw_roles: Optional[dict[str, object]]) -> bool:
-    return any(bool(enabled) for enabled in (raw_roles or {}).values())
-
-
-def _extract_enabled_role_identifiers(raw_roles: object) -> set[str]:
-    identifiers: set[str] = set()
-    if isinstance(raw_roles, dict):
-        for identifier, enabled in raw_roles.items():
-            normalized_identifier = str(identifier or "").strip().lower()
-            if normalized_identifier and bool(enabled):
-                identifiers.add(normalized_identifier)
-        return identifiers
-
-    if isinstance(raw_roles, list):
-        for identifier in raw_roles:
-            normalized_identifier = str(identifier or "").strip().lower()
-            if normalized_identifier:
-                identifiers.add(normalized_identifier)
-    return identifiers
-
-
-def _iter_enabled_permission_paths(
-    value: object,
-    *,
-    prefix: str = "",
-) -> list[str]:
-    if isinstance(value, bool):
-        return [prefix] if value and prefix else []
-
-    if isinstance(value, dict):
-        paths: list[str] = []
-        for key, child in value.items():
-            child_prefix = f"{prefix}.{key}" if prefix else str(key)
-            paths.extend(_iter_enabled_permission_paths(child, prefix=child_prefix))
-        return paths
-
-    if isinstance(value, list):
-        if prefix == "skills.skill_permissions" and any(
-            isinstance(entry, dict)
-            and (bool(entry.get("authorized", False)) or bool(entry.get("enabled", False)))
-            for entry in value
-        ):
-            return [prefix]
-        return []
-
-    return []
-
-
-def _is_non_admin_assignable_role(role: object) -> bool:
-    normalized_identifier = str(getattr(role, "identifier", "") or "").strip().lower()
-    if normalized_identifier in SENSITIVE_ROLE_IDENTIFIERS:
-        return False
-
-    normalized_permissions = RoleService.normalize_permissions(getattr(role, "permissions", None))
-    enabled_paths = set(_iter_enabled_permission_paths(normalized_permissions))
-    return enabled_paths.issubset(NON_ADMIN_ASSIGNABLE_PERMISSION_PATHS)
-
-
-async def _ensure_role_identifiers_exist(
-    session: AsyncSession,
-    role_identifiers: set[str],
-) -> None:
-    if not role_identifiers:
-        return
-
-    existing_roles = await RoleService.list_by_identifiers(session, sorted(role_identifiers))
-    existing_identifiers = {
-        str(getattr(role, "identifier", "") or "").strip().lower()
-        for role in existing_roles
-        if str(getattr(role, "identifier", "") or "").strip()
-    }
-    unknown_identifiers = sorted(role_identifiers - existing_identifiers)
-    if unknown_identifiers:
-        raise HTTPException(
-            status_code=400,
-            detail="Unknown role identifier(s): " + ", ".join(unknown_identifiers),
-        )
-
-
-async def _ensure_can_assign_roles(
-    session: AsyncSession,
-    authz: AuthorizationContext,
-    requested_roles: object,
-    *,
-    existing_roles: object = None,
-) -> None:
-    requested_identifiers = _extract_enabled_role_identifiers(requested_roles)
-    existing_identifiers = _extract_enabled_role_identifiers(existing_roles)
-
-    if requested_identifiers == existing_identifiers:
-        return
-
-    ensure_permission(
-        authz,
-        "users.assign_roles",
-        detail="Missing permission: users.assign_roles",
-    )
-
-    await _ensure_role_identifiers_exist(session, requested_identifiers)
-
-    if authz.is_admin:
-        return
-
-    changed_identifiers = sorted(requested_identifiers.symmetric_difference(existing_identifiers))
-    changed_sensitive_roles = [
-        identifier for identifier in changed_identifiers if identifier in SENSITIVE_ROLE_IDENTIFIERS
-    ]
-    if changed_sensitive_roles:
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                "Only administrators may grant or revoke role(s): "
-                + ", ".join(changed_sensitive_roles)
-            ),
-        )
-
-    changed_roles = await RoleService.list_by_identifiers(session, changed_identifiers)
-    changed_protected_roles = sorted(
-        str(role.identifier)
-        for role in changed_roles
-        if not _is_non_admin_assignable_role(role)
-    )
-    if changed_protected_roles:
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                "Only administrators may grant or revoke protected role(s): "
-                + ", ".join(changed_protected_roles)
-            ),
-        )
-
-
-def _changed_role_metadata_fields(existing_role: object, role_data: RoleUpdate) -> set[str]:
-    changed_fields: set[str] = set()
-    for field_name in {"name", "identifier", "description", "is_active"}:
-        if field_name not in role_data.model_fields_set:
-            continue
-        if getattr(role_data, field_name) != getattr(existing_role, field_name, None):
-            changed_fields.add(field_name)
-    return changed_fields
-
-
-def _user_profile_fields_present(user_data: UserUpdate) -> bool:
-    editable_fields = {"email", "display_name", "auth_type", "is_active", "avatar_url"}
-    return bool(editable_fields & user_data.model_fields_set)
-
-
-def _provider_config_to_response(item: object) -> ServiceProviderConfigResponse:
-    """Convert provider config ORM model to decrypted API response."""
-    return ServiceProviderConfigResponse(
-        id=getattr(item, "id"),
-        provider_type=getattr(item, "provider_type"),
-        instance_name=getattr(item, "instance_name"),
-        config=ServiceProviderConfigService.get_config(item),
-        is_active=getattr(item, "is_active"),
-        created_at=getattr(item, "created_at"),
-        updated_at=getattr(item, "updated_at"),
-    )
-
-
-def _default_user_setting_document() -> dict[str, object]:
-    """Return the default user_setting.json payload."""
-    return {
-        "channels": {},
-        "providers": {},
-        "preferences": {},
-    }
-
-
-def _get_user_setting_path(workspace_path: str, user_id: str) -> Path:
-    """Return the path to a user's user_setting.json file."""
-    return Path(workspace_path).resolve() / "users" / user_id / "user_setting.json"
-
-
-def _load_user_setting_document(workspace_path: str, user_id: str) -> dict[str, object]:
-    """Load the user's settings document, creating a default one when absent."""
-    config_path = _get_user_setting_path(workspace_path, user_id)
-    if not config_path.exists():
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        document = _default_user_setting_document()
-        config_path.write_text(
-            json.dumps(document, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        return document
-
-    try:
-        raw_document = json.loads(config_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        raw_document = {}
-
-    document = _default_user_setting_document()
-    if isinstance(raw_document, dict):
-        for section_name in document.keys():
-            section_value = raw_document.get(section_name)
-            if isinstance(section_value, dict):
-                document[section_name] = section_value
-    return document
-
-
-def _save_user_setting_document(workspace_path: str, user_id: str, document: dict[str, object]) -> None:
-    """Persist the user's settings document."""
-    config_path = _get_user_setting_path(workspace_path, user_id)
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(
-        json.dumps(document, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
-
-def _get_provider_template_config(
-    provider_type: str,
-    instance_name: str,
-) -> Optional[dict[str, object]]:
-    """Resolve a configured system provider template instance from atlasclaw.json."""
-    service_providers = get_config().service_providers or {}
-    provider_instances = service_providers.get(provider_type)
-    if not isinstance(provider_instances, dict):
-        return None
-    template_config = provider_instances.get(instance_name)
-    return dict(template_config) if isinstance(template_config, dict) else None
-
-
-def _normalize_user_provider_config(
-    provider_type: str,
-    instance_name: str,
-    config: dict[str, object],
-) -> dict[str, object]:
-    """Validate user-owned provider config against a system template instance."""
-    template_config = _get_provider_template_config(provider_type, instance_name)
-    if template_config is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Provider template '{provider_type}.{instance_name}' not found",
-        )
-
-    merged_config = dict(template_config)
-    merged_config.update(dict(config))
-
-    try:
-        normalized_config = normalize_provider_config(provider_type, merged_config)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    return {
-        key: value
-        for key, value in normalized_config.items()
-        if key != "base_url"
-    }
 
 
 router = APIRouter(prefix="/api", tags=["Database API"])
@@ -397,10 +80,8 @@ router.include_router(provider_info_router)
 async def create_agent_config(
     agent_data: AgentCreate,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> AgentResponse:
     """Create a new Agent configuration."""
-    ensure_permission(authz, "agent_configs.create", detail="Missing permission: agent_configs.create")
     existing = await AgentConfigService.get_by_name(session, agent_data.name)
     if existing:
         raise HTTPException(status_code=409, detail=f"Agent '{agent_data.name}' already exists")
@@ -415,10 +96,8 @@ async def list_agent_configs(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> AgentListResponse:
     """List all Agent configurations with optional filtering."""
-    ensure_permission(authz, "agent_configs.view", detail="Missing permission: agent_configs.view")
     agents, total = await AgentConfigService.list_all(session, is_active=is_active, page=page, page_size=page_size)
     return AgentListResponse(
         agents=[AgentResponse.model_validate(a) for a in agents],
@@ -430,10 +109,8 @@ async def list_agent_configs(
 async def get_agent_config(
     agent_id: str,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> AgentResponse:
     """Get Agent configuration by ID."""
-    ensure_permission(authz, "agent_configs.view", detail="Missing permission: agent_configs.view")
     agent = await AgentConfigService.get_by_id(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent config not found")
@@ -445,10 +122,8 @@ async def update_agent_config(
     agent_id: str,
     agent_data: AgentUpdate,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> AgentResponse:
     """Update an Agent configuration."""
-    ensure_permission(authz, "agent_configs.edit", detail="Missing permission: agent_configs.edit")
     agent = await AgentConfigService.update(session, agent_id, agent_data)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent config not found")
@@ -459,10 +134,8 @@ async def update_agent_config(
 async def delete_agent_config(
     agent_id: str,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> None:
     """Delete an Agent configuration."""
-    ensure_permission(authz, "agent_configs.delete", detail="Missing permission: agent_configs.delete")
     deleted = await AgentConfigService.delete(session, agent_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Agent config not found")
@@ -475,10 +148,8 @@ async def delete_agent_config(
 async def create_token_config(
     token_data: TokenCreate,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> TokenResponse:
     """Create a new Token configuration."""
-    ensure_permission(authz, "tokens.create", detail="Missing permission: tokens.create")
     existing = await ModelTokenConfigService.get_by_name(session, token_data.name)
     if existing:
         raise HTTPException(status_code=409, detail=f"Token '{token_data.name}' already exists")
@@ -496,10 +167,8 @@ async def list_token_configs(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> TokenListResponse:
     """List all Token configurations with optional filtering."""
-    ensure_permission(authz, "tokens.view", detail="Missing permission: tokens.view")
     tokens, total = await ModelTokenConfigService.list_all(session, provider=provider, is_active=is_active, page=page, page_size=page_size)
     
     responses = []
@@ -515,10 +184,8 @@ async def list_token_configs(
 async def get_token_config(
     token_id: str,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> TokenResponse:
     """Get Token configuration by ID."""
-    ensure_permission(authz, "tokens.view", detail="Missing permission: tokens.view")
     token = await ModelTokenConfigService.get_by_id(session, token_id)
     if token is None:
         raise HTTPException(status_code=404, detail="Token config not found")
@@ -533,10 +200,8 @@ async def update_token_config(
     token_id: str,
     token_data: TokenUpdate,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> TokenResponse:
     """Update a Token configuration."""
-    ensure_permission(authz, "tokens.edit", detail="Missing permission: tokens.edit")
     token = await ModelTokenConfigService.update(session, token_id, token_data)
     if token is None:
         raise HTTPException(status_code=404, detail="Token config not found")
@@ -550,10 +215,8 @@ async def update_token_config(
 async def delete_token_config(
     token_id: str,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> None:
     """Delete a Token configuration."""
-    ensure_permission(authz, "tokens.delete", detail="Missing permission: tokens.delete")
     deleted = await ModelTokenConfigService.delete(session, token_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Token config not found")
@@ -566,14 +229,8 @@ async def delete_token_config(
 async def create_provider_config(
     provider_data: ServiceProviderConfigCreate,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> ServiceProviderConfigResponse:
     """Create a new service provider instance configuration."""
-    ensure_permission(
-        authz,
-        "provider_configs.create",
-        detail="Missing permission: provider_configs.create",
-    )
     existing = await ServiceProviderConfigService.get_by_provider_instance(
         session,
         provider_data.provider_type,
@@ -587,17 +244,8 @@ async def create_provider_config(
             ),
         )
 
-    try:
-        normalized_config = normalize_provider_config(
-            provider_data.provider_type,
-            provider_data.config,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    provider_data = provider_data.model_copy(update={"config": normalized_config})
     item = await ServiceProviderConfigService.create(session, provider_data)
-    return _provider_config_to_response(item)
+    return ServiceProviderConfigResponse.model_validate(item)
 
 
 @router.get("/provider-configs", response_model=ServiceProviderConfigListResponse)
@@ -607,14 +255,8 @@ async def list_provider_configs(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> ServiceProviderConfigListResponse:
     """List service provider instance configurations with optional filtering."""
-    ensure_permission(
-        authz,
-        "provider_configs.view",
-        detail="Missing permission: provider_configs.view",
-    )
     items, total = await ServiceProviderConfigService.list_all(
         session,
         provider_type=provider_type,
@@ -623,7 +265,7 @@ async def list_provider_configs(
         page_size=page_size,
     )
     return ServiceProviderConfigListResponse(
-        provider_configs=[_provider_config_to_response(i) for i in items],
+        provider_configs=[ServiceProviderConfigResponse.model_validate(i) for i in items],
         total=total,
     )
 
@@ -632,18 +274,12 @@ async def list_provider_configs(
 async def get_provider_config(
     config_id: str,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> ServiceProviderConfigResponse:
     """Get service provider instance config by ID."""
-    ensure_permission(
-        authz,
-        "provider_configs.view",
-        detail="Missing permission: provider_configs.view",
-    )
     item = await ServiceProviderConfigService.get_by_id(session, config_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Provider config not found")
-    return _provider_config_to_response(item)
+    return ServiceProviderConfigResponse.model_validate(item)
 
 
 @router.put("/provider-configs/{config_id}", response_model=ServiceProviderConfigResponse)
@@ -651,20 +287,13 @@ async def update_provider_config(
     config_id: str,
     provider_data: ServiceProviderConfigUpdate,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> ServiceProviderConfigResponse:
     """Update a service provider instance config."""
-    ensure_permission(
-        authz,
-        "provider_configs.edit",
-        detail="Missing permission: provider_configs.edit",
-    )
     update_payload = provider_data.model_dump(exclude_unset=True)
-    current = None
 
     target_provider_type = update_payload.get("provider_type")
     target_instance_name = update_payload.get("instance_name")
-    if target_provider_type or target_instance_name or provider_data.config is not None:
+    if target_provider_type or target_instance_name:
         current = await ServiceProviderConfigService.get_by_id(session, config_id)
         if current is None:
             raise HTTPException(status_code=404, detail="Provider config not found")
@@ -684,37 +313,18 @@ async def update_provider_config(
                 ),
             )
 
-    if provider_data.config is not None:
-        effective_provider_type = target_provider_type or current.provider_type
-        try:
-            normalized_config = normalize_provider_config(
-                effective_provider_type,
-                provider_data.config,
-                existing_config=ServiceProviderConfigService.get_config(current),
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-        provider_data = provider_data.model_copy(update={"config": normalized_config})
-
     item = await ServiceProviderConfigService.update(session, config_id, provider_data)
     if item is None:
         raise HTTPException(status_code=404, detail="Provider config not found")
-    return _provider_config_to_response(item)
+    return ServiceProviderConfigResponse.model_validate(item)
 
 
 @router.delete("/provider-configs/{config_id}", status_code=204)
 async def delete_provider_config(
     config_id: str,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
 ) -> None:
     """Delete a service provider instance config."""
-    ensure_permission(
-        authz,
-        "provider_configs.delete",
-        detail="Missing permission: provider_configs.delete",
-    )
     deleted = await ServiceProviderConfigService.delete(session, config_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Provider config not found")
@@ -724,209 +334,13 @@ async def delete_provider_config(
 
 
 
-@router.post("/roles", response_model=RoleResponse, status_code=201)
-async def create_role(
-    role_data: RoleCreate,
-    session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
-) -> RoleResponse:
-    """Create a new Role."""
-    ensure_permission(authz, "roles.create", detail="Missing permission: roles.create")
-    ensure_can_manage_permission_modules(
-        authz,
-        role_data.permissions,
-        existing_permissions=None,
-    )
-    await RoleService.ensure_builtin_roles(session)
-
-    existing_name = await RoleService.get_by_name(session, role_data.name)
-    if existing_name:
-        raise HTTPException(status_code=409, detail=f"Role '{role_data.name}' already exists")
-
-    existing_identifier = await RoleService.get_by_identifier(session, role_data.identifier)
-    if existing_identifier:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Role identifier '{role_data.identifier}' already exists",
-        )
-
-    role = await RoleService.create(session, role_data)
-    await AuditService.log_audit(
-        session=session,
-        entity_type="role",
-        entity_id=role.id,
-        action="CREATE",
-        user_id=authz.user.user_id,
-        new_value=_serialize_role_for_audit(role),
-    )
-    return RoleResponse.model_validate(role)
-
-
-@router.get("/roles", response_model=RoleListResponse)
-async def list_roles(
-    search: Optional[str] = Query(None, description="Search by role name, identifier, or description"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
-) -> RoleListResponse:
-    """List all Roles with optional filtering."""
-    ensure_any_permission(
-        authz,
-        ROLE_CATALOG_ACCESS_PERMISSIONS,
-        detail="Missing permission to access role catalog",
-    )
-    roles, total = await RoleService.list_all(
-        session,
-        search=search,
-        is_active=is_active,
-        page=page,
-        page_size=page_size,
-    )
-    return RoleListResponse(
-        roles=[RoleResponse.model_validate(role) for role in roles],
-        total=total,
-    )
-
-
-@router.get("/roles/{role_id}", response_model=RoleResponse)
-async def get_role(
-    role_id: str,
-    session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
-) -> RoleResponse:
-    """Get Role by ID."""
-    ensure_any_permission(
-        authz,
-        ROLE_CATALOG_ACCESS_PERMISSIONS,
-        detail="Missing permission to access role catalog",
-    )
-    await RoleService.ensure_builtin_roles(session)
-    role = await RoleService.get_by_id(session, role_id)
-    if role is None:
-        raise HTTPException(status_code=404, detail="Role not found")
-    return RoleResponse.model_validate(role)
-
-
-@router.put("/roles/{role_id}", response_model=RoleResponse)
-async def update_role(
-    role_id: str,
-    role_data: RoleUpdate,
-    session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
-) -> RoleResponse:
-    """Update a Role."""
-    await RoleService.ensure_builtin_roles(session)
-    old_role = await RoleService.get_by_id(session, role_id)
-    if old_role is None:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    changed_metadata_fields = _changed_role_metadata_fields(old_role, role_data)
-    if old_role.is_builtin and changed_metadata_fields:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Built-in role metadata is read-only: "
-                + ", ".join(sorted(changed_metadata_fields))
-            ),
-        )
-
-    if changed_metadata_fields:
-        ensure_permission(authz, "roles.edit", detail="Missing permission: roles.edit")
-
-    if "permissions" in role_data.model_fields_set:
-        if old_role.is_builtin and is_system_managed_builtin_role(old_role.identifier):
-            raise HTTPException(
-                status_code=400,
-                detail="Built-in admin permissions are managed by the system and cannot be modified",
-            )
-        ensure_can_manage_permission_modules(
-            authz,
-            role_data.permissions,
-            existing_permissions=old_role.permissions,
-        )
-
-    if role_data.name and role_data.name != old_role.name:
-        existing_name = await RoleService.get_by_name(session, role_data.name)
-        if existing_name and existing_name.id != role_id:
-            raise HTTPException(status_code=409, detail=f"Role '{role_data.name}' already exists")
-
-    if "identifier" in role_data.model_fields_set and role_data.identifier != old_role.identifier:
-        raise HTTPException(
-            status_code=400,
-            detail="Role identifiers cannot be changed after creation",
-        )
-
-    if role_data.identifier:
-        existing_identifier = await RoleService.get_by_identifier(session, role_data.identifier)
-        if existing_identifier and existing_identifier.id != role_id:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Role identifier '{role_data.identifier}' already exists",
-            )
-
-    old_value = _serialize_role_for_audit(old_role)
-    role = await RoleService.update(session, role_id, role_data)
-    if role is None:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    await AuditService.log_audit(
-        session=session,
-        entity_type="role",
-        entity_id=role_id,
-        action="UPDATE",
-        user_id=authz.user.user_id,
-        old_value=old_value,
-        new_value=_serialize_role_for_audit(role),
-    )
-    return RoleResponse.model_validate(role)
-
-
-@router.delete("/roles/{role_id}", status_code=204)
-async def delete_role(
-    role_id: str,
-    session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
-) -> None:
-    """Delete a Role."""
-    ensure_permission(authz, "roles.delete", detail="Missing permission: roles.delete")
-    await RoleService.ensure_builtin_roles(session)
-    role = await RoleService.get_by_id(session, role_id)
-    if role is None:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    if role.is_builtin:
-        raise HTTPException(status_code=400, detail="Built-in roles cannot be deleted")
-
-    assigned_count = await UserService.count_users_with_role(session, role.identifier)
-    if assigned_count > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Role is currently assigned to {assigned_count} user(s)",
-        )
-
-    await RoleService.delete(session, role_id)
-    await AuditService.log_audit(
-        session=session,
-        entity_type="role",
-        entity_id=role_id,
-        action="DELETE",
-        user_id=authz.user.user_id,
-        old_value=_serialize_role_for_audit(role),
-    )
-
-
 @router.post("/users", response_model=UserResponse, status_code=201)
 async def create_user(
     user_data: UserCreate,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
+    admin: UserInfo = Depends(require_admin),
 ) -> UserResponse:
-    """Create a new User."""
-    ensure_permission(authz, "users.create", detail="Missing permission: users.create")
-    await _ensure_can_assign_roles(session, authz, user_data.roles)
-
+    """Create a new User. Requires admin privileges."""
     existing = await UserService.get_by_username(session, user_data.username)
     if existing:
         raise HTTPException(status_code=409, detail=f"User '{user_data.username}' already exists")
@@ -939,31 +353,24 @@ async def create_user(
     user = await UserService.create(session, user_data)
 
     # Audit log for user creation
-    try:
-        new_value = AuditService.sanitize_user_data({
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "display_name": user.display_name,
-            "is_active": user.is_active,
-            "is_admin": user.is_admin,
-            "auth_type": user.auth_type,
-            "roles": user.roles,
-        })
-        await AuditService.log_audit(
-            session=session,
-            entity_type="user",
-            entity_id=user.id,
-            action="CREATE",
-            user_id=authz.user.user_id,
-            new_value=new_value,
-        )
-    except Exception as e:
-        logging.getLogger(__name__).warning(
-            "Failed to write audit log for user creation (user=%s): %s",
-            user.username,
-            e,
-        )
+    new_value = AuditService.sanitize_user_data({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "display_name": user.display_name,
+        "is_active": user.is_active,
+        "is_admin": user.is_admin,
+        "auth_type": user.auth_type,
+        "roles": user.roles,
+    })
+    await AuditService.log_audit(
+        session=session,
+        entity_type="user",
+        entity_id=user.id,
+        action="CREATE",
+        user_id=admin.user_id,
+        new_value=new_value,
+    )
 
     return UserResponse.model_validate(user)
 
@@ -975,14 +382,9 @@ async def list_users(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
+    _admin: UserInfo = Depends(require_admin),
 ) -> UserListResponse:
-    """List all Users with optional filtering."""
-    ensure_any_permission(
-        authz,
-        USER_MANAGEMENT_ACCESS_PERMISSIONS,
-        detail="Missing permission to access user management",
-    )
+    """List all Users with optional filtering. Requires admin privileges."""
     users, total = await UserService.list_all(session, is_active=is_active, search=search, page=page, page_size=page_size)
     return UserListResponse(
         users=[UserResponse.model_validate(u) for u in users],
@@ -1002,7 +404,6 @@ async def get_my_profile(
         user_id=current_user.user_id,
         auth_type=current_user.auth_type,
         workspace_path=str(Path(get_config().workspace.path).resolve()),
-        external_subject=str(current_user.extra.get("external_subject", "")),
     )
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1042,51 +443,6 @@ async def update_my_profile(
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
     return UserResponse.model_validate(updated)
-
-
-@router.get("/users/me/provider-settings", response_model=UserProviderSettingsResponse, status_code=200)
-async def get_my_provider_settings(
-    current_user: UserInfo = Depends(get_current_user),
-) -> UserProviderSettingsResponse:
-    """Get the authenticated user's provider credentials bound to system templates."""
-    workspace_path = str(Path(get_config().workspace.path).resolve())
-    document = _load_user_setting_document(workspace_path, current_user.user_id)
-    providers = document.get("providers", {})
-    return UserProviderSettingsResponse(providers=providers if isinstance(providers, dict) else {})
-
-
-@router.put("/users/me/provider-settings", response_model=UserProviderSettingsResponse, status_code=200)
-async def update_my_provider_settings(
-    provider_data: UserProviderSettingUpdate,
-    current_user: UserInfo = Depends(get_current_user),
-) -> UserProviderSettingsResponse:
-    """Create or update the authenticated user's provider credentials."""
-    workspace_path = str(Path(get_config().workspace.path).resolve())
-    document = _load_user_setting_document(workspace_path, current_user.user_id)
-    providers = document.setdefault("providers", {})
-    if not isinstance(providers, dict):
-        providers = {}
-        document["providers"] = providers
-
-    provider_bucket = providers.setdefault(provider_data.provider_type, {})
-    if not isinstance(provider_bucket, dict):
-        provider_bucket = {}
-        providers[provider_data.provider_type] = provider_bucket
-
-    normalized_config = _normalize_user_provider_config(
-        provider_data.provider_type,
-        provider_data.instance_name,
-        provider_data.config,
-    )
-
-    provider_bucket[provider_data.instance_name] = {
-        "configured": True,
-        "config": normalized_config,
-        "updated_at": datetime.utcnow().isoformat() + "Z",
-    }
-
-    _save_user_setting_document(workspace_path, current_user.user_id, document)
-    return UserProviderSettingsResponse(providers=providers)
 
 
 @router.post("/users/me/avatar", response_model=UserResponse, status_code=200)
@@ -1171,14 +527,9 @@ async def change_my_password(
 async def get_user(
     user_id: str,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
+    _admin: UserInfo = Depends(require_admin),
 ) -> UserResponse:
-    """Get User by ID."""
-    ensure_any_permission(
-        authz,
-        USER_MANAGEMENT_ACCESS_PERMISSIONS,
-        detail="Missing permission to access user management",
-    )
+    """Get User by ID. Requires admin privileges."""
     user = await UserService.get_by_id(session, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1190,36 +541,13 @@ async def update_user(
     user_id: str,
     user_data: UserUpdate,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
+    admin: UserInfo = Depends(require_admin),
 ) -> UserResponse:
-    """Update a User."""
+    """Update a User. Requires admin privileges."""
     # Fetch old user data for audit log
     old_user = await UserService.get_by_id(session, user_id)
     if old_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-
-    if _user_profile_fields_present(user_data):
-        ensure_permission(authz, "users.edit", detail="Missing permission: users.edit")
-
-    if "password" in user_data.model_fields_set:
-        ensure_permission(
-            authz,
-            "users.reset_password",
-            detail="Missing permission: users.reset_password",
-        )
-
-    if "roles" in user_data.model_fields_set and (user_data.roles or {}) != (old_user.roles or {}):
-        await _ensure_can_assign_roles(
-            session,
-            authz,
-            user_data.roles,
-            existing_roles=old_user.roles,
-        )
-
-    if "email" in user_data.model_fields_set and user_data.email and user_data.email != old_user.email:
-        existing_user = await UserService.get_by_email(session, user_data.email)
-        if existing_user and existing_user.id != old_user.id:
-            raise HTTPException(status_code=409, detail="Email already in use")
 
     old_value = AuditService.sanitize_user_data({
         "id": old_user.id,
@@ -1252,7 +580,7 @@ async def update_user(
         entity_type="user",
         entity_id=user_id,
         action="UPDATE",
-        user_id=authz.user.user_id,
+        user_id=admin.user_id,
         old_value=old_value,
         new_value=new_value,
     )
@@ -1264,17 +592,16 @@ async def update_user(
 async def delete_user(
     user_id: str,
     session: AsyncSession = Depends(get_db_session),
-    authz: AuthorizationContext = Depends(get_authorization_context),
+    current_user: UserInfo = Depends(require_admin),
 ) -> None:
-    """Delete a User. Cannot delete own account."""
-    ensure_permission(authz, "users.delete", detail="Missing permission: users.delete")
+    """Delete a User. Requires admin privileges. Cannot delete own account."""
     # Fetch user data for audit log before deletion
     user = await UserService.get_by_id(session, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Prevent self-deletion for both local and federated identities.
-    if is_same_workspace_user(authz, user):
+    # Prevent self-deletion (compare against username since current_user.user_id is username)
+    if current_user.user_id == user.username:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
 
     old_value = AuditService.sanitize_user_data({
@@ -1298,6 +625,6 @@ async def delete_user(
         entity_type="user",
         entity_id=user_id,
         action="DELETE",
-        user_id=authz.user.user_id,
+        user_id=current_user.user_id,
         old_value=old_value,
     )

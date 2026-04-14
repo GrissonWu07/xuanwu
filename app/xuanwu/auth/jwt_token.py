@@ -34,7 +34,6 @@ def issue_xuanwu_token(
     expires_minutes: int,
     issuer: str,
     login_time: Optional[str] = None,
-    additional_claims: Optional[dict[str, Any]] = None,
 ) -> str:
     if not secret_key:
         raise AuthenticationError("JWT secret key is empty")
@@ -57,11 +56,6 @@ def issue_xuanwu_token(
         "roles": roles,
         "auth_type": auth_type,
     }
-    if isinstance(additional_claims, dict):
-        for key, value in additional_claims.items():
-            if key in payload or value is None:
-                continue
-            payload[key] = value
 
     header_b64 = _b64url_encode(_json_dumps(header).encode("utf-8"))
     payload_b64 = _b64url_encode(_json_dumps(payload).encode("utf-8"))

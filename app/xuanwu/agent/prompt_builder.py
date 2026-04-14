@@ -20,9 +20,8 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from app.atlasclaw.core.config import get_config
-from app.atlasclaw.agent.prompt_context_resolver import PromptContextResolver
-from app.atlasclaw.agent import prompt_sections
+from app.xuanwu.core.config import get_config
+from app.xuanwu.agent import prompt_sections
 
 if TYPE_CHECKING:
     from app.xuanwu.auth.models import UserInfo
@@ -49,7 +48,6 @@ class PromptBuilderConfig:
     """PromptBuilder configuration"""
     mode: PromptMode = PromptMode.FULL
     bootstrap_max_chars: int = 20000
-    bootstrap_total_max_chars: int = 40000
     workspace_path: str = ""
     user_timezone: Optional[str] = None
     time_format: str = "auto"  # auto | 12 | 24
@@ -64,14 +62,6 @@ class PromptBuilderConfig:
     md_skills_desc_max_chars: int = 200
     # Maximum number of Markdown skill entries in the index section
     md_skills_max_count: int = 20
-    # Total character budget for the unified capability index section
-    capability_index_max_chars: int = 3000
-    # Maximum description length for a single unified capability entry
-    capability_index_desc_max_chars: int = 200
-    # Maximum number of unified capability entries in the index section
-    capability_index_max_count: int = 20
-    # Maximum bytes to inline for a selected markdown skill body in stage-two expansion
-    md_skills_max_file_bytes: int = 262144
 
 
 class PromptBuilder:
@@ -112,8 +102,6 @@ class PromptBuilder:
         if not config.workspace_path:
             config.workspace_path = str(Path(get_config().workspace.path).expanduser().resolve())
         self.config = config
-        self._context_resolver = PromptContextResolver()
-        self._runtime_warnings: list[str] = []
     
     def build(
         self,
@@ -121,13 +109,12 @@ class PromptBuilder:
         skills: Optional[list[dict]] = None,
         tools: Optional[list[dict]] = None,
         md_skills: Optional[list[dict]] = None,
-        capability_index: Optional[list[dict]] = None,
         target_md_skill: Optional[dict] = None,
         tool_policy: Optional[dict] = None,
         user_info: Optional["UserInfo"] = None,
         provider_contexts: Optional[dict[str, dict]] = None,
-        context_window_tokens: Optional[int] = None,
-        mode_override: Optional[PromptMode] = None,
+        attachment_context: Optional[dict[str, list[dict]]] = None,
+        attachment_runtime: Optional[dict[str, str]] = None,
     ) -> str:
         """
         Build the full system prompt for the current run.
@@ -142,12 +129,8 @@ class PromptBuilder:
         Returns:
             The assembled system prompt text.
         """
-        effective_mode = mode_override or self.config.mode
-
-        if effective_mode == PromptMode.NONE:
+        if self.config.mode == PromptMode.NONE:
             return f"You are {self.config.agent_name}, {self.config.agent_description}."
-
-        self._runtime_warnings.clear()
         
         parts = []
         
@@ -170,25 +153,20 @@ class PromptBuilder:
             if user_ctx:
                 parts.append(user_ctx)
         
-        if target_md_skill:
-            parts.append(self._build_target_md_skill(target_md_skill))
-
-        if effective_mode == PromptMode.FULL:
+        if self.config.mode == PromptMode.FULL:
             # 4. Markdown skill index (HIGHEST PRIORITY - check these first!)
-            if capability_index is not None:
-                capability_section = self._build_capability_index(capability_index)
-                if capability_section:
-                    parts.append(capability_section)
-            else:
-                if md_skills:
-                    md_index = self._build_md_skills_index(md_skills, provider_contexts)
-                    if md_index:
-                        parts.append(md_index)
+            if md_skills:
+                md_index = self._build_md_skills_index(md_skills, provider_contexts)
+                if md_index:
+                    parts.append(md_index)
+            
+            # 4b. Executable skills (fallback only if no MD skill matches)
+            if skills:
+                parts.append(self._build_skills_listing(skills))
 
-                # 4b. Executable skills (fallback only if no MD skill matches)
-                if skills:
-                    parts.append(self._build_skills_listing(skills))
-
+            if target_md_skill:
+                parts.append(self._build_target_md_skill(target_md_skill))
+            
             # 5. Self-update instructions
             parts.append(self._build_self_update())
 
@@ -205,10 +183,7 @@ class PromptBuilder:
             parts.append(self._build_documentation())
             
             # 8. Project bootstrap context
-            bootstrap = self._build_bootstrap(
-                session=session,
-                context_window_tokens=context_window_tokens,
-            )
+            bootstrap = self._build_bootstrap()
             if bootstrap:
                 parts.append(bootstrap)
             
@@ -233,12 +208,6 @@ class PromptBuilder:
         parts.append(self._build_runtime_info())
         
         return "\n\n".join(p for p in parts if p)
-
-    def consume_warnings(self) -> list[str]:
-        """Return and clear prompt-build runtime warnings."""
-        warnings = list(self._runtime_warnings)
-        self._runtime_warnings.clear()
-        return warnings
 
     def _build_target_md_skill(self, target_md_skill: dict[str, str]) -> str:
         return prompt_sections.build_target_md_skill(target_md_skill)
@@ -267,9 +236,6 @@ class PromptBuilder:
         provider_contexts: Optional[dict[str, dict]] = None,
     ) -> str:
         return prompt_sections.build_md_skills_index(self.config, md_skills, provider_contexts)
-
-    def _build_capability_index(self, capability_index: list[dict]) -> str:
-        return prompt_sections.build_capability_index(self.config, capability_index)
     
     def _build_self_update(self) -> str:
         return prompt_sections.build_self_update()
@@ -286,12 +252,7 @@ class PromptBuilder:
     def _build_documentation(self) -> str:
         return prompt_sections.build_documentation()
     
-    def _build_bootstrap(
-        self,
-        *,
-        session: Optional[object] = None,
-        context_window_tokens: Optional[int] = None,
-    ) -> str:
+    def _build_bootstrap(self) -> str:
         """
 
 
@@ -308,46 +269,25 @@ inject Bootstrap
         marker_file = workspace / self.config.new_workspace_marker
         is_new_workspace = marker_file.exists()
         
-        target_files: list[str] = []
+        any_found = False
         for filename in self.BOOTSTRAP_FILES:
+            # BOOTSTRAP.md at workspace inject
             if filename == "BOOTSTRAP.md" and not is_new_workspace:
                 continue
-            target_files.append(filename)
-
-        existing_target_files: list[str] = []
-        for filename in target_files:
-            file_path = workspace / filename
-            if not file_path.exists():
-                self._record_warning(f"Missing bootstrap file: {filename}")
-                continue
-            existing_target_files.append(filename)
-
-        session_key = getattr(session, "session_key", None) if session is not None else None
-        budget_decision = self._context_resolver.resolve_budgets(
-            configured_total_budget=self.config.bootstrap_total_max_chars,
-            configured_per_file_budget=self.config.bootstrap_max_chars,
-            context_window_tokens=context_window_tokens,
-        )
-        resolved_files = self._context_resolver.resolve(
-            workspace=workspace,
-            filenames=existing_target_files,
-            session_key=str(session_key or ""),
-            total_budget=budget_decision.total_budget,
-            per_file_budget=budget_decision.per_file_budget,
-        )
-        for item in resolved_files:
-            content = item.content
-            if item.truncated:
-                self._record_warning(
-                    "Bootstrap context truncated by budget: "
-                    f"{item.filename} (per_file={budget_decision.per_file_budget}, total={budget_decision.total_budget})"
-                )
-                content = (
-                    f"{content}\n...[Truncated by prompt budget "
-                    f"(per_file={budget_decision.per_file_budget}, total={budget_decision.total_budget}, "
-                    f"source={budget_decision.source})]"
-                )
-            sections.append(f"### {item.filename}\n\n{content}")
+                
+            filepath = workspace / filename
+            if filepath.exists():
+                try:
+                    content = filepath.read_text(encoding="utf-8")
+                    if len(content) > self.config.bootstrap_max_chars:
+                        content = (
+                            content[:self.config.bootstrap_max_chars]
+                            + f"\n...[Truncated at {self.config.bootstrap_max_chars} characters]"
+                        )
+                    sections.append(f"### {filename}\n\n{content}")
+                    any_found = True
+                except Exception as e:
+                    sections.append(f"### {filename}\n\n[Read failed: {e}]")
         
         # inject BOOTSTRAP.md workspace(run)
         if is_new_workspace and marker_file.exists():
@@ -356,15 +296,7 @@ inject Bootstrap
             except Exception:
                 pass  # 
         
-        return "\n\n".join(sections) if len(sections) > 2 else ""
-
-    def _record_warning(self, message: str) -> None:
-        normalized = str(message or "").strip()
-        if not normalized:
-            return
-        if normalized in self._runtime_warnings:
-            return
-        self._runtime_warnings.append(normalized)
+        return "\n\n".join(sections) if any_found else ""
     
     def is_new_workspace(self) -> bool:
         """
@@ -466,7 +398,6 @@ convertworkspace workspace
             "bootstrap_files": files_info,
             "total_bootstrap_size": total_size,
             "bootstrap_max_chars": self.config.bootstrap_max_chars,
-            "bootstrap_total_max_chars": self.config.bootstrap_total_max_chars,
         }
         
         # mode

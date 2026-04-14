@@ -1,5 +1,5 @@
-﻿from app.atlasclaw.core.config_schema import SearchRuntimeConfig
-from app.atlasclaw.tools.web.provider_models import (
+from app.xuanwu.core.config_schema import SearchRuntimeConfig
+from app.xuanwu.tools.web.provider_models import (
     GroundedSearchResponse,
     SearchProviderCapabilities,
     SearchProviderType,

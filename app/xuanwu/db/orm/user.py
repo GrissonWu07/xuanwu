@@ -3,20 +3,18 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import bcrypt
-from sqlalchemy import select, func, or_, text
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.atlasclaw.db.models import UserModel, generate_uuid
-from app.atlasclaw.db.schemas import UserCreate, UserUpdate
+from app.xuanwu.db.models import UserModel
+from app.xuanwu.db.schemas import UserCreate, UserUpdate
 
 logger = logging.getLogger(__name__)
-_LEGACY_SQLITE_USERS_IS_ADMIN_COLUMN_CACHE: Dict[str, bool] = {}
 
 
 def hash_password(password: str) -> str:
@@ -47,119 +45,6 @@ def verify_password(password: str, password_digest: str) -> bool:
         return False
 
 
-def _has_role_assignment(raw_roles: Any, role_identifier: str) -> bool:
-    """Return whether a role identifier is assigned in either dict or legacy list storage."""
-    normalized_role_identifier = str(role_identifier or "").strip().lower()
-    if not normalized_role_identifier:
-        return False
-
-    if isinstance(raw_roles, dict):
-        return any(
-            bool(enabled) and str(identifier or "").strip().lower() == normalized_role_identifier
-            for identifier, enabled in raw_roles.items()
-        )
-
-    if isinstance(raw_roles, list):
-        return any(
-            str(identifier or "").strip().lower() == normalized_role_identifier
-            for identifier in raw_roles
-        )
-
-    return False
-
-
-async def _has_legacy_sqlite_users_is_admin_column(session: AsyncSession) -> bool:
-    """Return whether the connected SQLite users table still requires the legacy is_admin column."""
-    bind = session.get_bind()
-    if bind is None or bind.dialect.name != "sqlite":
-        return False
-
-    cache_key = str(bind.engine.url)
-    cached = _LEGACY_SQLITE_USERS_IS_ADMIN_COLUMN_CACHE.get(cache_key)
-    if cached is not None:
-        return cached
-
-    result = await session.execute(text("PRAGMA table_info(users)"))
-    has_legacy_column = any(str(row[1]) == "is_admin" for row in result.fetchall())
-    _LEGACY_SQLITE_USERS_IS_ADMIN_COLUMN_CACHE[cache_key] = has_legacy_column
-    return has_legacy_column
-
-
-async def _create_user_for_legacy_sqlite_schema(
-    session: AsyncSession,
-    user_data: UserCreate,
-    *,
-    password_digest: Optional[str],
-) -> UserModel:
-    """Insert a user into legacy SQLite schemas that still require the is_admin column."""
-    user_id = generate_uuid()
-    user = UserModel(
-        id=user_id,
-        username=user_data.username,
-        email=user_data.email,
-        password=password_digest,
-        auth_type=getattr(user_data, "auth_type", "local") or "local",
-        display_name=user_data.display_name,
-        roles=user_data.roles,
-        is_active=user_data.is_active,
-    )
-    now = datetime.utcnow()
-
-    await session.execute(
-        text("""
-            INSERT INTO users (
-                id,
-                username,
-                email,
-                password,
-                auth_type,
-                roles,
-                is_active,
-                is_admin,
-                display_name,
-                avatar_url,
-                last_login_at,
-                created_at,
-                updated_at
-            ) VALUES (
-                :id,
-                :username,
-                :email,
-                :password,
-                :auth_type,
-                :roles,
-                :is_active,
-                :is_admin,
-                :display_name,
-                :avatar_url,
-                :last_login_at,
-                :created_at,
-                :updated_at
-            )
-        """),
-        {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "password": user.password,
-            "auth_type": user.auth_type,
-            "roles": json.dumps(user.roles) if user.roles is not None else None,
-            "is_active": user.is_active,
-            "is_admin": _has_role_assignment(user.roles, "admin"),
-            "display_name": user.display_name,
-            "avatar_url": None,
-            "last_login_at": None,
-            "created_at": now,
-            "updated_at": now,
-        },
-    )
-
-    created_user = await UserService.get_by_id(session, user.id)
-    if created_user is None:
-        raise RuntimeError(f"Failed to load newly created user '{user.username}' from legacy schema")
-    return created_user
-
-
 
 class UserService:
     """Service operations for User configuration."""
@@ -180,15 +65,6 @@ class UserService:
         if user_data.password:
             password = hash_password(user_data.password)
 
-        if await _has_legacy_sqlite_users_is_admin_column(session):
-            user = await _create_user_for_legacy_sqlite_schema(
-                session,
-                user_data,
-                password_digest=password,
-            )
-            logger.info(f"Created user: {user.username} (id={user.id})")
-            return user
-
         user = UserModel(
             username=user_data.username,
             email=user_data.email,
@@ -197,6 +73,7 @@ class UserService:
             display_name=user_data.display_name,
             roles=user_data.roles,
             is_active=user_data.is_active,
+            is_admin=user_data.is_admin,
         )
 
         session.add(user)
@@ -354,7 +231,6 @@ class UserService:
             return None
 
         update_data = user_data.model_dump(exclude_unset=True)
-        update_data.pop("is_admin", None)
 
         # Hash new password if provided
         if "password" in update_data and update_data["password"]:
@@ -410,13 +286,6 @@ class UserService:
         user.last_login_at = datetime.utcnow()
         await session.flush()
         return user
-
-    @staticmethod
-    async def count_users_with_role(session: AsyncSession, role_identifier: str) -> int:
-        """Count users currently assigned to a role identifier."""
-        result = await session.execute(select(UserModel))
-        users = result.scalars().all()
-        return sum(1 for user in users if _has_role_assignment(user.roles, role_identifier))
 
     @staticmethod
     def to_user_info(user: UserModel) -> Dict[str, Any]:

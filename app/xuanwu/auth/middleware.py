@@ -12,11 +12,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse
 
-from app.atlasclaw.auth.config import AuthConfig
-from app.atlasclaw.auth.jwt_token import verify_atlas_token
-from app.atlasclaw.auth.models import ANONYMOUS_USER, AuthenticationError, UserInfo
-from app.atlasclaw.auth.strategy import AuthStrategy
-from app.atlasclaw.core.base_path import build_base_path_url, normalize_base_path
+from app.xuanwu.auth.config import AuthConfig
+from app.xuanwu.auth.jwt_token import verify_atlas_token
+from app.xuanwu.auth.models import ANONYMOUS_USER, AuthenticationError, UserInfo
+from app.xuanwu.auth.strategy import AuthStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -80,51 +79,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user_info = ANONYMOUS_USER
             return await call_next(request)
 
+        if request.url.path in _SSO_PATHS:
+            request.state.user_info = ANONYMOUS_USER
+            return await call_next(request)
+
         if self._anonymous_fallback:
             request.state.user_info = ANONYMOUS_USER
             return await call_next(request)
 
         provider_name = self._current_provider_name()
 
+
         if provider_name == "none":
             try:
                 request.state.user_info = await self._strategy.resolve_user("")
             except Exception:
                 request.state.user_info = ANONYMOUS_USER
-            return await call_next(request)
-
-        # CMP mode: extract user identity from CMP cookies (no API call)
-        # Must run BEFORE _SSO_PATHS skip so /api/auth/me gets CMP user info
-        if provider_name == "cmp":
-            from app.atlasclaw.auth.providers.cmp import CMPAuthProvider
-            cookies = dict(request.cookies)
-            logger.warning("CMP DEBUG: path=%s cookies=%s", request.url.path, list(cookies.keys()))
-            cmp_provider = self._strategy.primary_provider
-            if not isinstance(cmp_provider, CMPAuthProvider):
-                return JSONResponse(status_code=500, content={"detail": "CMP provider misconfigured"})
-            try:
-                auth_result = await cmp_provider.authenticate_from_cookies(cookies)
-                logger.warning("CMP DEBUG: auth_result subject=%s", auth_result.subject)
-                shadow = await self._strategy._shadow_store.get_or_create(
-                    provider="cmp", result=auth_result,
-                )
-                logger.warning("CMP DEBUG: shadow user_id=%s", shadow.user_id)
-                self._strategy.ensure_user_workspace(shadow.user_id)
-                request.state.user_info = shadow.to_user_info(
-                    raw_token=auth_result.raw_token
-                )
-                logger.warning("CMP DEBUG: user_info set, proceeding")
-                return await call_next(request)
-            except AuthenticationError as exc:
-                logger.warning("CMP cookie auth FAILED (AuthenticationError): %s", exc)
-                return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-            except Exception as exc:
-                logger.warning("CMP cookie auth FAILED (unexpected): %s %s", type(exc).__name__, exc)
-                return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-
-        # SSO paths: skip auth for non-CMP providers (login, callback, etc.)
-        if request.url.path in _SSO_PATHS:
-            request.state.user_info = ANONYMOUS_USER
             return await call_next(request)
 
         if provider_name != "none":
@@ -192,24 +162,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         user_id = str(payload.get("sub", "")).strip() or "default"
         auth_type = str(payload.get("auth_type", "local")).strip() or "local"
-        external_subject = str(payload.get("external_subject", "")).strip()
-        provider_subject = str(payload.get("provider_subject", "")).strip()
 
         # Include is_admin in extra for guards to check
         extra = {
             "login_time": payload.get("login_time", ""),
             "is_admin": payload.get("is_admin", False),
         }
-        if external_subject:
-            extra["external_subject"] = external_subject
 
         return UserInfo(
             user_id=user_id,
-            display_name=str(payload.get("display_name", "")).strip() or user_id,
+            display_name=user_id,
             tenant_id="default",
             roles=roles,
             raw_token=raw_token,
-            provider_subject=provider_subject or (f"{auth_type}:{external_subject}" if external_subject else f"{auth_type}:{user_id}"),
+            provider_subject=f"{auth_type}:{user_id}",
             extra=extra,
             auth_type=auth_type,
         )
@@ -219,25 +185,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return provider.provider_name() if provider is not None else "none"
 
     def _auth_failed_response(self, request: Request):
-        config = getattr(request.app.state, "config", None)
-        base_path = normalize_base_path(getattr(config, "base_path", ""))
+
         if request.url.path == "/" or self._is_browser_request(request):
             provider_name = self._current_provider_name()
 
             # SSO providers (oidc, dingtalk, etc.) redirect to /api/auth/login
             # Use reverse exclusion pattern: all providers except local/none/empty are SSO
             # This way, new SSO providers (feishu, wecom, etc.) work without code changes
-            if provider_name not in ("local", "none", "cmp", ""):
-                return RedirectResponse(
-                    url=build_base_path_url(base_path, "/api/auth/login"),
-                    status_code=302,
-                )
+            if provider_name not in ("local", "none", ""):
+                return RedirectResponse(url="/api/auth/login", status_code=302)
 
-            original = build_base_path_url(base_path, request.url.path)
+            original = f"{request.url.path}"
             if request.url.query:
                 original = f"{original}?{request.url.query}"
-            login_path = build_base_path_url(base_path, "/login.html")
-            redirect_url = f"{login_path}?redirect={quote(original, safe='')}"
+            redirect_url = f"/login.html?redirect={quote(original, safe='')}"
             return RedirectResponse(url=redirect_url, status_code=302)
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
 
@@ -257,17 +218,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if token:
                 return token
 
-        return ""
-
-    @staticmethod
-    def _extract_cmp_token(request: Request) -> str:
-        """Extract CloudChef-Authenticate token from header or cookie."""
-        token = request.headers.get("CloudChef-Authenticate", "").strip()
-        if token:
-            return token
-        token = request.cookies.get("CloudChef-Authenticate", "").strip()
-        if token:
-            return token
         return ""
 
     @staticmethod

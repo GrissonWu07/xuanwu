@@ -82,11 +82,6 @@ class DingTalkAuthConfig(BaseModel):
         )
 
 
-class CMPAuthConfig(BaseModel):
-    """CMP platform cookie-based authentication configuration."""
-    pass
-
-
 class NoneAuthConfig(BaseModel):
     """No-auth / development mode provider configuration."""
     default_user_id: str = "default"
@@ -141,7 +136,6 @@ class AuthConfig(BaseModel):
 
     oidc: OIDCAuthConfig = OIDCAuthConfig()
     dingtalk: DingTalkAuthConfig = DingTalkAuthConfig()
-    cmp: CMPAuthConfig = CMPAuthConfig()
     none: NoneAuthConfig = NoneAuthConfig()
     local: LocalAuthConfig = LocalAuthConfig()
     jwt: JWTAuthConfig = JWTAuthConfig()
@@ -169,8 +163,6 @@ class AuthConfig(BaseModel):
                 raise ValueError(
                     "auth.local.default_admin_username is required when auth.provider='local'"
                 )
-        elif p == "cmp":
-            pass  # CMP uses browser cookies, no config validation needed
         elif p == "dingtalk":
             dt = self.dingtalk.expanded()
             if not dt.app_key:

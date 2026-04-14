@@ -4,16 +4,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone as dt_timezone
-import re
 from typing import Any, Optional, TYPE_CHECKING
 
 import httpx
 
-from app.atlasclaw.tools.base import ToolResult
+from app.xuanwu.tools.base import ToolResult
 
 if TYPE_CHECKING:
     from pydantic_ai import RunContext
-    from app.atlasclaw.core.deps import SkillDeps
+    from app.xuanwu.core.deps import SkillDeps
 
 
 _GEOCODING_ENDPOINT = "https://geocoding-api.open-meteo.com/v1/search"
@@ -70,76 +69,6 @@ def _safe_int(value: Any) -> Optional[int]:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _normalize_location_token(value: Any) -> str:
-    normalized = str(value or "").strip().lower()
-    if not normalized:
-        return ""
-    normalized = normalized.replace(" ", "")
-    for suffix in (
-        "特别行政区",
-        "自治区",
-        "自治州",
-        "省",
-        "市",
-        "区",
-        "县",
-    ):
-        if normalized.endswith(suffix) and len(normalized) > len(suffix):
-            normalized = normalized[: -len(suffix)]
-            break
-    return normalized
-
-
-def _is_cjk_location_query(value: str) -> bool:
-    return bool(re.search(r"[\u4e00-\u9fff]", str(value or "")))
-
-
-def _needs_city_suffix_retry(*, query: str, results: list[dict[str, Any]]) -> bool:
-    normalized_query = _normalize_location_token(query)
-    if not normalized_query or str(query or "").strip().endswith("市"):
-        return False
-    if not _is_cjk_location_query(str(query or "")):
-        return False
-    for item in results:
-        if not isinstance(item, dict):
-            continue
-        normalized_name = _normalize_location_token(item.get("name"))
-        normalized_admin1 = _normalize_location_token(item.get("admin1"))
-        if normalized_name == normalized_query and normalized_admin1 == normalized_query:
-            return False
-    return True
-
-
-def _select_best_geocoding_result(
-    *,
-    results: list[dict[str, Any]],
-    query: str,
-    country_code: Optional[str],
-) -> dict[str, Any]:
-    normalized_query = _normalize_location_token(query)
-    normalized_country_code = str(country_code or "").strip().upper()
-
-    def _score(item: dict[str, Any]) -> tuple[int, int, int, int]:
-        normalized_name = _normalize_location_token(item.get("name"))
-        normalized_admin1 = _normalize_location_token(item.get("admin1"))
-        score = 0
-        if normalized_country_code and str(item.get("country_code", "") or "").strip().upper() == normalized_country_code:
-            score += 30
-        if normalized_name and normalized_name == normalized_query:
-            score += 100
-        elif normalized_query and normalized_query and normalized_query in normalized_name:
-            score += 40
-        if normalized_admin1 and normalized_admin1 == normalized_query:
-            score += 80
-        elif normalized_query and normalized_query in normalized_admin1:
-            score += 20
-        population = _safe_int(item.get("population")) or 0
-        rank = _safe_int(item.get("rank")) or 0
-        return (score, population, rank, -results.index(item))
-
-    return max(results, key=_score)
 
 
 async def _request_json(
@@ -301,7 +230,7 @@ async def openmeteo_weather_tool(
 
     geocoding_params: dict[str, Any] = {
         "name": normalized_location,
-        "count": 8,
+        "count": 1,
         "language": "zh",
         "format": "json",
     }
@@ -326,33 +255,7 @@ async def openmeteo_weather_tool(
             details={"tool": "openmeteo_weather", "location": normalized_location},
         ).to_dict()
 
-    normalized_results = [item for item in results if isinstance(item, dict)]
-    if _needs_city_suffix_retry(query=normalized_location, results=normalized_results):
-        retry_params = dict(geocoding_params)
-        retry_params["name"] = f"{normalized_location}市"
-        try:
-            retry_payload = await _request_json(
-                url=_GEOCODING_ENDPOINT,
-                params=retry_params,
-            )
-        except Exception:
-            retry_payload = {}
-        retry_results = retry_payload.get("results")
-        if isinstance(retry_results, list) and retry_results:
-            normalized_results.extend(
-                item for item in retry_results if isinstance(item, dict)
-            )
-    if not normalized_results:
-        return ToolResult.error(
-            f"No location found for '{normalized_location}'.",
-            details={"tool": "openmeteo_weather", "location": normalized_location},
-        ).to_dict()
-
-    top_hit = _select_best_geocoding_result(
-        results=normalized_results,
-        query=normalized_location,
-        country_code=country_code,
-    )
+    top_hit = results[0] if isinstance(results[0], dict) else {}
     latitude = _safe_float(top_hit.get("latitude"))
     longitude = _safe_float(top_hit.get("longitude"))
     resolved_name = str(top_hit.get("name", normalized_location) or normalized_location)
