@@ -13,10 +13,6 @@ services:
       - /opt/xuanwu/workspace:/app/workspace
       # Data: host /opt/xuanwu/data -> container /app/data
       - /opt/xuanwu/data:/app/data
-      # Extensions: host /opt/xuanwu/extensions -> container /app/extensions
-      - /opt/xuanwu/extensions/providers:/app/extensions/providers
-      - /opt/xuanwu/extensions/skills:/app/extensions/skills
-      - /opt/xuanwu/extensions/channels:/app/extensions/channels
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]

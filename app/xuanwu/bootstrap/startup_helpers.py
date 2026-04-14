@@ -55,7 +55,7 @@ def print_root_plugins(label: str, root: Path, plugins: list[str]) -> None:
 
 
 def check_and_prompt_for_providers(providers_root: Path) -> None:
-    """Check if providers_root directory is empty."""
+    """Print optional providers_root hint without requiring external repositories."""
 
     def _is_empty_or_missing(dir_path: Path) -> bool:
         if not dir_path.exists():
@@ -66,15 +66,10 @@ def check_and_prompt_for_providers(providers_root: Path) -> None:
             return True
 
     if _is_empty_or_missing(providers_root):
-        print("\n" + "=" * 70)
-        print("[XuanWu] NOTICE: providers_root directory is empty")
-        print("=" * 70)
-        print(f"  - Providers root is empty: {providers_root}")
-        print("\nTo get started with providers and skills, please run:")
-        print("\n  git clone https://github.com/CloudChef/xuanwu-providers.git")
-        print(f"  # Configure xuanwu.json with \"providers_root\": \"{providers_root}\"")
-        print("\nOr manually place provider folders under the providers_root directory above.")
-        print("=" * 70 + "\n")
+        print(
+            f"[XuanWu] providers_root not found or empty: {providers_root} "
+            "(optional, built-in skills/channels continue to work)"
+        )
 
 
 def expand_env_value(value: str) -> str:

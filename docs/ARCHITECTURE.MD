@@ -671,8 +671,8 @@ Providers are the primary extension point. A provider is a directory containing:
 **Locations** (override priority):
 1. Workspace: `<workspace>/skills/` (optional, for development)
 2. Global: `~/.xuanwu/skills/`
-3. Skills root: `<skills_root>/` (configured in xuanwu.json, default: `../xuanwu-providers/skills`)
-4. Providers: `<providers_root>/<provider>/skills/` (configured in xuanwu.json, default: `../xuanwu-providers/providers`)
+3. Skills root: `<skills_root>/` (configured in xuanwu.json, default: `./.xuanwu/skills`)
+4. Providers: `<providers_root>/<provider>/skills/` (configured in xuanwu.json, default: `./.xuanwu/providers`)
 5. Built-in: `app/xuanwu/providers/`
 
 ### 9.2 Skill Extension

@@ -67,7 +67,7 @@ docker compose version
 ### 1. Create Deployment Directory
 
 ```bash
-mkdir -p /opt/xuanwu/{workspace,data,secrets,extensions/{providers,skills,channels}}
+mkdir -p /opt/xuanwu/{workspace,data,secrets}
 cd /opt/xuanwu
 ```
 
@@ -82,10 +82,6 @@ cd /opt/xuanwu
 ├── workspace/              # Configuration, logs, user data
 │   └── xuanwu.json      # Main configuration file
 ├── data/                   # Database runtime data
-└── extensions/
-    ├── providers/          # Provider extensions
-    ├── skills/             # Custom skills
-    └── channels/           # Custom channels
 ```
 
 ### 2. Download Compose File
@@ -94,33 +90,19 @@ cd /opt/xuanwu
 curl -o docker-compose.yml https://raw.githubusercontent.com/CloudChef/xuanwu/main/build/docker-compose.enterprise.yml
 ```
 
-### 3. Download Extensions (Optional)
+### 3. Skills Strategy (Built-In + Downloaded)
 
-Download providers, skills, and channels from the official repository:
+No external providers repository is required.
 
-```bash
-cd /opt/xuanwu/extensions
+XuanWu uses a hybrid strategy:
 
-# Download and extract the repository (no git required)
-curl -L -o xuanwu-providers.zip https://github.com/CloudChef/xuanwu-providers/archive/refs/heads/main.zip
-unzip xuanwu-providers.zip
-mv xuanwu-providers-main src
-rm xuanwu-providers.zip
-
-# Copy providers (optional)
-cp -r src/providers/* ./providers/ 2>/dev/null || true
-
-# Copy skills (optional)
-cp -r src/skills/* ./skills/ 2>/dev/null || true
-
-# Copy channels (optional)
-cp -r src/channels/* ./channels/ 2>/dev/null || true
-
-# Remove source directory
-rm -rf src
-```
-
-**Note:** Extensions are optional. XuanWu will start successfully even without any extensions installed.
+- Built-in skills/channels/providers shipped in image:
+  - `/app/app/xuanwu/skills`
+  - `/app/app/xuanwu/channels`
+  - `/app/app/xuanwu/providers` (optional provider template root)
+- User-downloaded skills/channels loaded from workspace paths:
+  - `/app/workspace/skills`
+  - `/app/workspace/channels`
 
 ### 4. Configure LLM Model (Required)
 
@@ -168,9 +150,8 @@ Create `/opt/xuanwu/workspace/xuanwu.json`:
       "charset": "utf8mb4"
     }
   },
-  "providers_root": "/app/extensions/providers",
-  "skills_root": "/app/extensions/skills",
-  "channels_root": "/app/extensions/channels",
+  "skills_root": "/app/workspace/skills",
+  "channels_root": "/app/workspace/channels",
   "model": {
     "primary": "deepseek-main",
     "fallbacks": [],
@@ -202,7 +183,7 @@ Create `/opt/xuanwu/workspace/xuanwu.json`:
 
 1. **You MUST replace `YOUR_API_KEY_HERE`** with your actual LLM API key (e.g., DeepSeek, OpenAI)
 2. **`model.tokens` cannot be empty** - At least one token entry is **required** for startup
-3. **`providers_root`**, **`skills_root`**, and **`channels_root`** should be set to `/app/extensions/providers`, `/app/extensions/skills`, `/app/extensions/channels`
+3. **`skills_root`** and **`channels_root`** should point to writable workspace paths for user-downloaded content: `/app/workspace/skills`, `/app/workspace/channels`
 4. `workspace.path` should use container path `/app/workspace`
 5. MySQL host is `mysql` (service name in docker-compose)
 
@@ -274,13 +255,15 @@ docker pull registry.cn-shanghai.aliyuncs.com/xuanwu/xuanwu-official:latest
 
 ## Optional: Skills & Channels Configuration
 
-Skills and channels in `/opt/xuanwu/extensions/` are automatically loaded on startup.
+Built-in skills/channels are auto-loaded from `/app/app/xuanwu/*`.
+User-downloaded skills/channels are loaded from `/app/workspace/*` by default.
+You can still override `skills_root` / `channels_root` in `xuanwu.json`.
 
 ### Skill Structure
 
 **Markdown Skill:**
 ```
-/opt/xuanwu/extensions/skills/
+/opt/xuanwu/workspace/skills/
 └── deployment/
     ├── SKILL.md             # Skill definition
     ├── requirements.txt     # Dependencies (optional)
@@ -290,7 +273,7 @@ Skills and channels in `/opt/xuanwu/extensions/` are automatically loaded on sta
 
 **Executable Skill:**
 ```
-/opt/xuanwu/extensions/skills/
+/opt/xuanwu/workspace/skills/
 └── monitoring/
     ├── __init__.py
     ├── skill.py             # Python implementation
@@ -326,13 +309,9 @@ Add to `/opt/xuanwu/workspace/xuanwu.json`:
 }
 ```
 
-### Reload Extensions
+### Reload Skills/Channels
 
 ```bash
-# Reload without restart
-docker compose exec xuanwu xuanwu reload all
-
-# Or restart
 docker compose restart xuanwu
 ```
 
@@ -442,14 +421,13 @@ docker compose logs xuanwu
 docker run --rm -v /opt/xuanwu/workspace/xuanwu.json:/app/xuanwu.json:ro registry.cn-shanghai.aliyuncs.com/xuanwu/xuanwu-official:latest python -c "import json; json.load(open('/app/xuanwu.json'))"
 ```
 
-### Providers Not Loading
+### Built-In Roots Verification
 
 ```bash
-# Check providers directory exists
-ls -la /opt/xuanwu/extensions/providers/
-
-# Verify providers_root in config
-cat /opt/xuanwu/workspace/xuanwu.json | grep -A 1 providers_root
+cat /opt/xuanwu/workspace/xuanwu.json | grep -E "skills_root|channels_root"
+ls -la /opt/xuanwu/workspace/skills/
+ls -la /opt/xuanwu/workspace/channels/
+ls -la /app/app/xuanwu/skills/
 ```
 
 ### Database Connection Failed
