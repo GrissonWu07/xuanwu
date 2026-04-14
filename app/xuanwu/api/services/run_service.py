@@ -91,10 +91,9 @@ async def execute_agent_run(
     attachment_link_ttl_seconds: Optional[int] = None,
 ) -> None:
     _user_info = user_info or ANONYMOUS_USER
-    thread_files = _build_thread_file_service(ctx, session_key, _user_info)
-    runtime_batch = await thread_files.create_runtime_batch()
-    runtime_snapshot = await thread_files.snapshot_runtime_files(runtime_batch.batch_id)
-    deps = None
+    encountered_error = False
+    final_error_message = ""
+    final_answer_committed = False
 
     try:
         target_agent_id = SessionKey.from_string(session_key).agent_id or "main"
@@ -149,6 +148,8 @@ async def execute_agent_run(
                     result=result_str,
                 )
             elif event.type == "error":
+                encountered_error = True
+                final_error_message = str(event.error or final_error_message or "")
                 ctx.sse_manager.push_error(run_id, event.error)
             elif event.type == "thinking":
                 ctx.sse_manager.push_thinking(
@@ -158,6 +159,12 @@ async def execute_agent_run(
                     metadata=event.metadata if event.metadata else None,
                 )
             elif event.type == "runtime":
+                runtime_state = str((event.metadata or {}).get("state", "") or "").strip().lower()
+                if runtime_state == "failed":
+                    encountered_error = True
+                    final_error_message = str(event.content or final_error_message or "")
+                elif runtime_state == "answered" and str(event.content or "").strip() == "Final answer ready.":
+                    final_answer_committed = True
                 ctx.sse_manager.push_runtime(
                     run_id,
                     str((event.metadata or {}).get("state", "")),
@@ -166,8 +173,14 @@ async def execute_agent_run(
                 )
 
         if run_id in ctx.active_runs:
-            ctx.active_runs[run_id]["status"] = "completed"
-            ctx.active_runs[run_id]["completed_at"] = datetime.now(timezone.utc)
+            if encountered_error or not final_answer_committed:
+                ctx.active_runs[run_id]["status"] = "error"
+                ctx.active_runs[run_id]["error"] = (
+                    final_error_message or "Run ended without a committed final answer"
+                )
+            else:
+                ctx.active_runs[run_id]["status"] = "completed"
+                ctx.active_runs[run_id]["completed_at"] = datetime.now(timezone.utc)
 
     except asyncio.TimeoutError:
         ctx.sse_manager.push_error(run_id, "Agent execution timed out")

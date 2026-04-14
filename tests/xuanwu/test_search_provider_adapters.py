@@ -1,6 +1,6 @@
-import pytest
+﻿import pytest
 
-from app.xuanwu.tools.web.provider_adapters import (
+from app.atlasclaw.tools.web.provider_adapters import (
     BingPageType,
     BingHtmlFallbackProvider,
     GoogleHtmlFallbackProvider,

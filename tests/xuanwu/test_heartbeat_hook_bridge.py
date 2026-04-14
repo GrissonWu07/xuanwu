@@ -6,12 +6,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.xuanwu.heartbeat.events import emit_heartbeat_event_to_hook_runtime
-from app.xuanwu.heartbeat.models import HeartbeatEventEnvelope, HeartbeatEventType, HeartbeatJobType
-from app.xuanwu.hooks.runtime import HookHandlerDefinition, HookRuntime, HookRuntimeContext
-from app.xuanwu.hooks.runtime_models import HookEventType
-from app.xuanwu.hooks.runtime_sinks import ContextSink, MemorySink
-from app.xuanwu.hooks.runtime_store import HookStateStore
+from app.atlasclaw.heartbeat.events import emit_heartbeat_event_to_hook_runtime
+from app.atlasclaw.heartbeat.models import HeartbeatEventEnvelope, HeartbeatEventType, HeartbeatJobType
+from app.atlasclaw.hooks.runtime import HookHandlerDefinition, HookRuntime, HookRuntimeContext
+from app.atlasclaw.hooks.runtime_models import HookEventType
+from app.atlasclaw.hooks.runtime_sinks import ContextSink, MemorySink
+from app.atlasclaw.hooks.runtime_store import HookStateStore
 
 
 @dataclass

@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from app.xuanwu.hooks.runtime_models import HookContextInjection, HookWriteMemoryRequest
-from app.xuanwu.hooks.runtime_store import HookStateStore
+from app.atlasclaw.hooks.runtime_models import HookContextInjection, HookWriteMemoryRequest
+from app.atlasclaw.hooks.runtime_store import HookStateStore
 
 
 @dataclass

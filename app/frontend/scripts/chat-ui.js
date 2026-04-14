@@ -3,11 +3,11 @@
  * Configure DeepChat component integration with Xuanwu API
  */
 
-import { getSessionKey, initSession, setSessionKey } from './session-manager.js'
-import { getAgentInfo, getSessionHistory } from './api-client.js'
-import { createStreamHandler } from './stream-handler.js'
-import { buildApiUrl } from './config.js'
-import { t, isLocaleLoaded, getCurrentLocale } from './i18n.js'
+import { getSessionKey, initSession, setSessionKey, setSessionHasMessages } from './session-manager.js?v=19'
+import { getAgentInfo, getSessionHistory } from './api-client.js?v=19'
+import { createStreamHandler } from './stream-handler.js?v=19'
+import { buildApiUrl } from './config.js?v=19'
+import { translateIfExists, getCurrentLocale } from './i18n.js'
 
 let chatElement = null
 let currentStreamHandler = null
@@ -18,8 +18,41 @@ let userHasScrolledUp = false
 let chatCallbacks = {}
 let currentSessionKey = null
 let currentAgentInfo = null
+let isComposing = false // Track IME composition state for macOS/Asian input
+let blockNextEnterAfterComposition = false
+let blockNextEnterStartedAt = 0
+
+const IME_ENTER_GUARD_MS = 150
 
 const SCROLL_THRESHOLD = 50
+
+function clearImeEnterGuard() {
+  blockNextEnterAfterComposition = false
+  blockNextEnterStartedAt = 0
+}
+
+function armImeEnterGuard() {
+  blockNextEnterAfterComposition = true
+  blockNextEnterStartedAt = Date.now()
+}
+
+function hasActiveImeEnterGuard() {
+  if (!blockNextEnterAfterComposition) return false
+  if ((Date.now() - blockNextEnterStartedAt) > IME_ENTER_GUARD_MS) {
+    clearImeEnterGuard()
+    return false
+  }
+  return true
+}
+
+function shouldBlockImeEnter(event) {
+  if (event?.key !== 'Enter') return false
+  return isComposing ||
+    event.isComposing === true ||
+    event.keyCode === 229 ||
+    event.which === 229 ||
+    hasActiveImeEnterGuard()
+}
 
 function getMessageContainer() {
   const dc = document.querySelector('deep-chat')
@@ -27,6 +60,70 @@ function getMessageContainer() {
   return dc.shadowRoot.querySelector('.messages-container') ||
     dc.shadowRoot.querySelector('[class*="message-container"]') ||
     dc.shadowRoot.querySelector('#messages')
+}
+
+/**
+ * Set up IME composition event listeners for macOS/Asian input handling.
+ * This prevents Enter from submitting while composing and for the first
+ * commit Enter right after composition ends on macOS browsers.
+ */
+function setupCompositionListeners() {
+  const dc = document.querySelector('deep-chat')
+  if (!dc?.shadowRoot) {
+    // Retry after a delay if shadow root not ready
+    setTimeout(setupCompositionListeners, 500)
+    return
+  }
+  
+  // Find the input element (textarea, input, or contenteditable)
+  const inputElement = dc.shadowRoot.querySelector('textarea') ||
+                      dc.shadowRoot.querySelector('input[type="text"]') ||
+                      dc.shadowRoot.querySelector('[contenteditable="true"]')
+  
+  if (!inputElement) {
+    console.warn('[ChatUI] No input element found for composition listeners, retrying...')
+    setTimeout(setupCompositionListeners, 500)
+    return
+  }
+  
+  // Check if already attached
+  if (inputElement._compositionListenersAttached) {
+    return
+  }
+  
+  // Track composition state
+  inputElement.addEventListener('compositionstart', () => {
+    isComposing = true
+    clearImeEnterGuard()
+    console.debug('[ChatUI] IME composition started')
+  })
+  
+  inputElement.addEventListener('compositionend', () => {
+    isComposing = false
+    armImeEnterGuard()
+    console.debug('[ChatUI] IME composition ended')
+  })
+  
+  // Intercept Enter both during composition and for the first macOS commit Enter
+  inputElement.addEventListener('keydown', (e) => {
+    if (!shouldBlockImeEnter(e)) {
+      return
+    }
+
+    if (hasActiveImeEnterGuard() && !isComposing && e.isComposing !== true) {
+      clearImeEnterGuard()
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+      console.debug('[ChatUI] Enter key blocked during IME composition')
+    }
+  }, true) // Use capture phase to intercept before Deep Chat
+  
+  inputElement._compositionListenersAttached = true
+  console.log('[ChatUI] IME composition listeners attached to:', inputElement.tagName)
 }
 
 function getLatestRuntimePanel(container) {
@@ -111,7 +208,9 @@ details.runtime-panel[open] .runtime-toggle{transform:rotate(90deg)}
 .runtime-chip.failed{background:#fef2f2;color:#b91c1c}
 .runtime-log{display:flex;flex-direction:column;gap:8px}
 .runtime-log-item{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;color:#475569}
+.runtime-log-item.active .runtime-log-message{color:#334155}
 .runtime-log-label{min-width:120px;font-weight:600;color:#1f2937}
+.runtime-log-live-dot{display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:50%;background:#60a5fa;animation:thinking-pulse-minimal 1.5s ease-in-out infinite;vertical-align:middle}
 .runtime-log-time{min-width:44px;font-size:12px;font-variant-numeric:tabular-nums;color:#94a3b8}
 .runtime-log-message{flex:1}
 .response-content{word-break:break-word}
@@ -138,6 +237,10 @@ export async function initChat(element, callbacks = {}) {
   currentAgentInfo = await loadAgentInfo()
   configureHandler(element)
   configureI18nAttributes(element)
+  
+  // Set up IME composition handling for macOS/Asian input
+  setupCompositionListeners()
+  
   await activateSession(getSessionKey())
 
   console.log('[ChatUI] Initialized')
@@ -150,6 +253,7 @@ export async function activateSession(sessionKey) {
     setSessionKey(currentSessionKey)
   }
   const hasHistory = await restoreSessionHistory(chatElement, currentSessionKey)
+  setSessionHasMessages(hasHistory)
   notifyConversationState(hasHistory)
   return hasHistory
 }
@@ -354,7 +458,7 @@ function configureI18nAttributes(element) {
     ${THINKING_STYLES}
   `
 
-  const placeholder = isLocaleLoaded() ? t('chat.placeholder') : 'Enter your question...'
+  const placeholder = translateIfExists('chat.placeholder') || 'Enter your question...'
   element.textInput = {
     placeholder: {
       text: placeholder,
@@ -377,20 +481,16 @@ function configureI18nAttributes(element) {
 }
 
 function notifyConversationState(hasMessages) {
+  setSessionHasMessages(hasMessages)
   if (typeof chatCallbacks.onConversationStateChange === 'function') {
     chatCallbacks.onConversationStateChange({ hasMessages, agentInfo: currentAgentInfo })
   }
 }
 
 function notifyUserTurnStarted(sessionKey, messageText) {
+  setSessionHasMessages(true)
   if (typeof chatCallbacks.onUserTurnStarted === 'function') {
     chatCallbacks.onUserTurnStarted({ sessionKey, messageText })
-  }
-}
-
-function notifyToolEvent(payload) {
-  if (typeof chatCallbacks.onToolEvent === 'function') {
-    chatCallbacks.onToolEvent(payload || {})
   }
 }
 
@@ -403,14 +503,34 @@ async function notifyRunCompleted(sessionKey) {
 }
 
 const RUNTIME_STATE_LABELS = {
-  reasoning: 'Runtime',
+  reasoning: 'Thinking',
   retrying: 'Retrying',
   waiting_for_tool: 'Waiting for tool',
   tool_running: 'Running tool',
   controlled_path: 'Controlled path',
-  answered: 'Answered',
   failed: 'Failed'
 }
+
+const EARLY_RUNTIME_PHASES = [
+  {
+    delayMs: 120,
+    state: 'reasoning',
+    message: 'Preparing model request context.',
+    metadata: { phase: 'model_message_history_build' }
+  },
+  {
+    delayMs: 260,
+    state: 'reasoning',
+    message: 'Starting model session.',
+    metadata: { phase: 'agent_iter_open' }
+  },
+  {
+    delayMs: 420,
+    state: 'reasoning',
+    message: 'Waiting for model tool decision.',
+    metadata: { phase: 'agent_first_node_wait' }
+  }
+]
 
 function buildThinkingHtml(thinkingContent, elapsedSeconds = null, isThinking = false) {
   if (!thinkingContent) return ''
@@ -422,43 +542,44 @@ function formatRuntimeHeaderElapsed(elapsedMs) {
   return `${(elapsedMs / 1000).toFixed(1)}s`
 }
 
-function buildRuntimePanel(runtimeEntries, thinkingContent, elapsedMs = null, isThinking = false, panelOpen = null) {
+function buildRuntimePanel(runtimeEntries, thinkingContent, elapsedMs = null, isThinking = false, panelOpen = null, isComplete = false) {
   const entries = Array.isArray(runtimeEntries) ? runtimeEntries : []
   const hasThinkingText = !!(thinkingContent && thinkingContent.trim())
-  let visibleEntries = entries
-  if (!hasThinkingText) {
-    const firstEntry = entries[0] || null
-    const warningEntries = entries.filter((entry) => entry.state === 'warning')
-    const terminalEntry = [...entries].reverse().find((entry) => entry.state === 'answered' || entry.state === 'failed')
-    const compact = []
-    if (firstEntry) compact.push(firstEntry)
-    for (const entry of warningEntries) {
-      if (!compact.includes(entry)) compact.push(entry)
-    }
-    if (terminalEntry && !compact.includes(terminalEntry)) compact.push(terminalEntry)
-    visibleEntries = compact
-  }
+  const visibleEntries = entries
   if (!visibleEntries.length && !hasThinkingText) {
     return ''
   }
-  const chipEntries = visibleEntries.filter((entry, index) => {
+  const hasAnswered = !!isComplete
+  const hasFailed = visibleEntries.some((entry) => entry.state === 'failed')
+  const displayEntries = visibleEntries.filter((entry) => (
+    entry.state !== 'answered' &&
+    entry.state !== 'answering' &&
+    String(entry.message || '').trim() !== 'Reasoning phase completed.'
+  ))
+  const chipEntries = displayEntries.filter((entry, index) => {
     if (index === 0) return true
-    return entry.state !== visibleEntries[index - 1].state
+    return entry.state !== displayEntries[index - 1].state
   })
   const chips = chipEntries.map((entry, index) => {
     const label = RUNTIME_STATE_LABELS[entry.state] || entry.state
     const activeClass = index === chipEntries.length - 1 ? ' active' : ''
     return `<span class="runtime-chip ${entry.state || ''}${activeClass}">${escapeHtml(label)}</span>`
   }).join('')
-  const logs = visibleEntries.map((entry) => {
+  const logs = displayEntries.map((entry, index) => {
     const label = RUNTIME_STATE_LABELS[entry.state] || entry.state || 'Runtime'
     const message = entry.message ? escapeHtml(entry.message) : ''
-    const time = formatElapsed(entry.elapsedMs)
-    return `<div class="runtime-log-item"><span class="runtime-log-time">${escapeHtml(time)}</span><span class="runtime-log-label">${escapeHtml(label)}</span><span class="runtime-log-message">${message}</span></div>`
+    const isActiveEntry = !hasAnswered && !hasFailed && index === displayEntries.length - 1
+    const effectiveElapsedMs = (
+      isActiveEntry && typeof elapsedMs === 'number' && !Number.isNaN(elapsedMs)
+    )
+      ? Math.max(entry.elapsedMs || 0, elapsedMs)
+      : entry.elapsedMs
+    const time = formatElapsed(effectiveElapsedMs)
+    const activeClass = isActiveEntry ? ' active' : ''
+    const liveBadge = isActiveEntry ? '<span class="runtime-log-live-dot"></span>' : ''
+    return `<div class="runtime-log-item${activeClass}"><span class="runtime-log-time">${escapeHtml(time)}</span><span class="runtime-log-label">${liveBadge}${escapeHtml(label)}</span><span class="runtime-log-message">${message}</span></div>`
   }).join('')
   const thinkingHtml = buildThinkingHtml(thinkingContent, elapsedMs, isThinking)
-  const hasAnswered = visibleEntries.some((entry) => entry.state === 'answered')
-  const hasFailed = visibleEntries.some((entry) => entry.state === 'failed')
   const titleIcon = hasAnswered
     ? '<span class="runtime-state-icon done">✓</span>'
     : !hasFailed
@@ -470,7 +591,7 @@ function buildRuntimePanel(runtimeEntries, thinkingContent, elapsedMs = null, is
     : ''
   const shouldOpen = typeof panelOpen === 'boolean' ? panelOpen : isThinking
   const detailsAttrs = shouldOpen ? ' open' : ''
-  return `<details class="runtime-panel"${detailsAttrs}><summary><div class="runtime-summary-left"><span class="runtime-title">Runtime</span>${titleIcon}${titleElapsedHtml}</div><div class="runtime-summary-right"><span class="runtime-toggle">></span></div></summary><div class="runtime-body">${chips ? `<div class="runtime-statuses">${chips}</div>` : ''}${logs ? `<div class="runtime-log">${logs}</div>` : ''}${thinkingHtml}</div></details>`
+  return `<details class="runtime-panel"${detailsAttrs}><summary><div class="runtime-summary-left"><span class="runtime-title">Thinking</span>${titleIcon}${titleElapsedHtml}</div><div class="runtime-summary-right"><span class="runtime-toggle">></span></div></summary><div class="runtime-body">${chips ? `<div class="runtime-statuses">${chips}</div>` : ''}${logs ? `<div class="runtime-log">${logs}</div>` : ''}${thinkingHtml}</div></details>`
 }
 
 function formatElapsed(elapsedMs) {
@@ -481,15 +602,17 @@ function formatElapsed(elapsedMs) {
   return `${(elapsedMs / 1000).toFixed(1)}s`
 }
 
-function buildMessageContent(runtimeEntries, thinkingContent, responseContent, elapsedMs = null, isThinking = false, panelOpen = null) {
-  const runtimeHtml = buildRuntimePanel(runtimeEntries, thinkingContent, elapsedMs, isThinking, panelOpen)
+function buildMessageContent(runtimeEntries, thinkingContent, responseContent, elapsedMs = null, isThinking = false, panelOpen = null, isComplete = false, renderRevision = 0) {
+  const runtimeHtml = buildRuntimePanel(runtimeEntries, thinkingContent, elapsedMs, isThinking, panelOpen, isComplete)
   const responseHtml = responseContent
     ? `<div class="response-content">${renderAssistantMarkdown(responseContent)}</div>`
     : ''
   if (!runtimeHtml && !responseHtml) {
     return { html: '' }
   }
-  return { html: `<div class="message-wrapper">${runtimeHtml}${responseHtml}</div>` }
+  return {
+    html: `<div class="message-wrapper" data-render-revision="${renderRevision}">${runtimeHtml}${responseHtml}</div>`
+  }
 }
 
 function escapeHtml(text) {
@@ -510,8 +633,39 @@ function sanitizeLinkUrl(url) {
   const normalized = (url || '').trim()
   if (!normalized) return '#'
   if (/^https?:\/\//i.test(normalized)) return normalized
-  if (normalized.startsWith('/')) return normalized
   return '#'
+}
+
+function stripWrapperHeading(text) {
+  let normalized = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/^[\uFEFF\u200B\u200C\u200D\s]+/, '')
+  if (!normalized.trim()) return ''
+  const wrapperPattern = /^(answer|result|response|回答|结果|回复)\s*[:：-]?$/i
+
+  while (normalized.trim()) {
+    const lines = normalized.split('\n')
+    const firstLine = (lines[0] || '').trim()
+    const secondLine = (lines[1] || '').trim()
+
+    if (wrapperPattern.test(firstLine) && /^=+\s*$/.test(secondLine)) {
+      normalized = lines.slice(2).join('\n').replace(/^[\uFEFF\u200B\u200C\u200D\s]+/, '')
+      continue
+    }
+    if (/^#{1,3}\s+/.test(firstLine)) {
+      const headingText = firstLine.replace(/^#{1,3}\s+/, '').trim()
+      if (wrapperPattern.test(headingText)) {
+        normalized = lines.slice(1).join('\n').replace(/^[\uFEFF\u200B\u200C\u200D\s]+/, '')
+        continue
+      }
+    }
+    if (wrapperPattern.test(firstLine)) {
+      normalized = lines.slice(1).join('\n').replace(/^[\uFEFF\u200B\u200C\u200D\s]+/, '')
+      continue
+    }
+    break
+  }
+  return normalized
 }
 
 function renderInlineMarkdown(line) {
@@ -527,7 +681,8 @@ function renderInlineMarkdown(line) {
 }
 
 function renderAssistantMarkdown(text) {
-  const escaped = escapeHtml(text || '').replace(/\r\n/g, '\n')
+  const cleaned = stripWrapperHeading(text || '')
+  const escaped = escapeHtml(cleaned).replace(/\r\n/g, '\n')
   if (!escaped.trim()) return ''
 
   const lines = escaped.split('\n')
@@ -547,11 +702,40 @@ function renderAssistantMarkdown(text) {
     listType = null
   }
 
-  for (const rawLine of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index]
     const line = (rawLine || '').trim()
     if (!line) {
       flushParagraph()
       flushList()
+      continue
+    }
+
+    const nextLine = (lines[index + 1] || '').trim()
+    if (
+      line &&
+      !/^(#{1,3})\s+/.test(line) &&
+      !/^[-*]\s+/.test(line) &&
+      !/^\d+\.\s+/.test(line) &&
+      /^=+$/.test(nextLine)
+    ) {
+      flushParagraph()
+      flushList()
+      htmlParts.push(`<h1>${renderInlineMarkdown(line)}</h1>`)
+      index += 1
+      continue
+    }
+    if (
+      line &&
+      !/^(#{1,3})\s+/.test(line) &&
+      !/^[-*]\s+/.test(line) &&
+      !/^\d+\.\s+/.test(line) &&
+      /^-+$/.test(nextLine)
+    ) {
+      flushParagraph()
+      flushList()
+      htmlParts.push(`<h2>${renderInlineMarkdown(line)}</h2>`)
+      index += 1
       continue
     }
 
@@ -588,6 +772,26 @@ function renderAssistantMarkdown(text) {
       continue
     }
 
+    const pipeFieldMatch = /^\|\s*(.+?)\s*[:：]\s*(.+)$/.exec(line)
+    if (pipeFieldMatch) {
+      flushParagraph()
+      if (listType !== 'ul') {
+        flushList()
+        htmlParts.push('<ul>')
+        listType = 'ul'
+      }
+      htmlParts.push(
+        `<li>${renderInlineMarkdown(`${pipeFieldMatch[1]}: ${pipeFieldMatch[2]}`)}</li>`
+      )
+      continue
+    }
+
+    if (/^[=+\-|]{8,}\s*$/.test(line) || line === '|') {
+      flushParagraph()
+      flushList()
+      continue
+    }
+
     flushList()
     paragraph.push(line)
   }
@@ -611,6 +815,10 @@ async function handleStreamWithSignals(runId, signals, context) {
   let runtimePanelUserOverride = false
   let runtimePanelOpen = null
   let runtimeEntries = [{ state: 'reasoning', message: 'Starting response analysis.' }]
+  let finalAnswerReady = false
+  let serverRuntimeSeen = false
+  let localRuntimeSeedTimers = []
+  let renderRevision = 0
 
   function currentElapsedMs() {
     if (runStartTime) {
@@ -619,19 +827,95 @@ async function handleStreamWithSignals(runId, signals, context) {
     return 0
   }
 
-  function pushRuntimeEntry(state, message, metadata = {}) {
+  function pushRuntimeEntry(state, message, metadata = {}, options = {}) {
+    const forceAppend = !!options.forceAppend
+    const normalizedState = String(state || 'reasoning').trim().toLowerCase()
+    if (normalizedState === 'answered' || normalizedState === 'answering') {
+      if (/final answer ready/i.test(String(message || ''))) {
+        finalAnswerReady = true
+      }
+      return
+    }
+    const serverElapsed = typeof metadata?.elapsed === 'number' && !Number.isNaN(metadata.elapsed)
+      ? Math.max(0, Math.round(metadata.elapsed * 1000))
+      : null
+    const nowElapsedMs = currentElapsedMs()
     const nextEntry = {
-      state: state || 'reasoning',
+      state: normalizedState || 'reasoning',
       message: message || '',
       metadata,
-      elapsedMs: currentElapsedMs()
+      elapsedMs: serverElapsed ?? nowElapsedMs,
+      reportedElapsedMs: serverElapsed,
+      createdAtMs: nowElapsedMs
     }
     const lastEntry = runtimeEntries[runtimeEntries.length - 1]
-    if (lastEntry && lastEntry.state === nextEntry.state && lastEntry.message === nextEntry.message) {
-      runtimeEntries = [...runtimeEntries.slice(0, -1), nextEntry]
+    if (!forceAppend && lastEntry && lastEntry.state === nextEntry.state && lastEntry.message === nextEntry.message) {
+      runtimeEntries = [...runtimeEntries.slice(0, -1), {
+        ...nextEntry,
+        createdAtMs: lastEntry.createdAtMs ?? nextEntry.createdAtMs,
+        reportedElapsedMs: nextEntry.reportedElapsedMs ?? lastEntry.reportedElapsedMs ?? null
+      }]
       return
     }
     runtimeEntries = [...runtimeEntries, nextEntry]
+  }
+
+  function clearLocalRuntimeSeedTimers() {
+    for (const timerId of localRuntimeSeedTimers) {
+      clearTimeout(timerId)
+    }
+    localRuntimeSeedTimers = []
+  }
+
+  function scheduleLocalEarlyRuntimePhases() {
+    clearLocalRuntimeSeedTimers()
+    localRuntimeSeedTimers = EARLY_RUNTIME_PHASES.map((phase) => setTimeout(() => {
+      if (serverRuntimeSeen || finalAnswerReady) return
+      pushRuntimeEntry(
+        phase.state,
+        phase.message,
+        {
+          ...(phase.metadata || {}),
+          elapsed: currentElapsedMs() / 1000,
+          synthetic: true
+        }
+      )
+      updateUI()
+    }, phase.delayMs))
+  }
+
+  function refreshActiveRuntimeEntry() {
+    const lastEntry = runtimeEntries[runtimeEntries.length - 1]
+    if (!lastEntry) return
+    if (lastEntry.state === 'failed') return
+    const nowElapsedMs = currentElapsedMs()
+    const phaseStartedMs = typeof lastEntry.createdAtMs === 'number'
+      ? lastEntry.createdAtMs
+      : nowElapsedMs
+    const reportedElapsedMs = typeof lastEntry.reportedElapsedMs === 'number'
+      ? lastEntry.reportedElapsedMs
+      : null
+    const effectiveElapsedMs = Math.max(reportedElapsedMs ?? 0, nowElapsedMs)
+    const metadata = { ...(lastEntry.metadata || {}), elapsed: effectiveElapsedMs / 1000 }
+    const phase = String(lastEntry.metadata?.phase || '')
+    if (
+      phase === 'agent_first_node_wait' &&
+      !lastEntry.metadata?.waitProgressShown &&
+      nowElapsedMs - phaseStartedMs >= 4500
+    ) {
+      pushRuntimeEntry(
+        lastEntry.state,
+        'Still waiting for model tool decision.',
+        {
+          ...metadata,
+          phase: 'agent_first_node_wait_progress',
+          waitProgressShown: true
+        },
+        { forceAppend: true }
+      )
+      return
+    }
+    pushRuntimeEntry(lastEntry.state, lastEntry.message, metadata)
   }
 
   function autoPanelShouldOpen() {
@@ -661,6 +945,7 @@ async function handleStreamWithSignals(runId, signals, context) {
 
   function updateUI() {
     try {
+      renderRevision += 1
       const panelShouldOpen = currentPanelShouldOpen()
       const content = buildMessageContent(
         runtimeEntries,
@@ -668,7 +953,9 @@ async function handleStreamWithSignals(runId, signals, context) {
         aiMessageContent,
         currentElapsedMs(),
         !thinkingFinalized,
-        panelShouldOpen
+        panelShouldOpen,
+        finalAnswerReady,
+        renderRevision
       )
       if (content.html) {
         signals.onResponse({ html: content.html, overwrite: true })
@@ -710,11 +997,12 @@ async function handleStreamWithSignals(runId, signals, context) {
   function startRunTimer() {
     if (runTimerInterval) return
     runTimerInterval = setInterval(() => {
-      const hasTerminalState = runtimeEntries.some((entry) => entry.state === 'answered' || entry.state === 'failed')
+      const hasTerminalState = finalAnswerReady || runtimeEntries.some((entry) => entry.state === 'failed')
       if (hasTerminalState && thinkingFinalized) {
         stopRunTimer()
         return
       }
+      refreshActiveRuntimeEntry()
       updateUI()
     }, 100)
   }
@@ -727,10 +1015,10 @@ async function handleStreamWithSignals(runId, signals, context) {
   }
 
   return new Promise((resolve) => {
+    scheduleLocalEarlyRuntimePhases()
     startRunTimer()
     currentStreamHandler = createStreamHandler(runId, {
       onStart: () => {
-        pushRuntimeEntry('reasoning', 'Model accepted the request and started reasoning.', { phase: 'start' })
         updateUI()
       },
       onDelta: (data) => {
@@ -739,7 +1027,6 @@ async function handleStreamWithSignals(runId, signals, context) {
           thinkingFinalized = true
           stopThinkingTimer()
         }
-        pushRuntimeEntry('answered', 'Final answer is streaming.', { phase: 'answering' })
         aiMessageContent += data.content
         hasRenderedDelta = true
         if (!assistantUpdatePending) {
@@ -752,21 +1039,10 @@ async function handleStreamWithSignals(runId, signals, context) {
       },
       onToolStart: (data) => {
         pushRuntimeEntry('tool_running', `Running tool: ${data?.tool_name || 'tool'}`, { phase: 'running_tool' })
-        notifyToolEvent({
-          phase: 'start',
-          toolName: data?.tool_name || 'tool',
-          runId
-        })
         updateUI()
       },
       onToolEnd: (data) => {
         pushRuntimeEntry('waiting_for_tool', `Tool completed: ${data?.tool_name || 'tool'}`, { phase: 'tool_completed' })
-        notifyToolEvent({
-          phase: 'end',
-          toolName: data?.tool_name || 'tool',
-          runId,
-          result: data?.result || ''
-        })
         updateUI()
       },
       onThinkingStart: () => {
@@ -804,17 +1080,24 @@ async function handleStreamWithSignals(runId, signals, context) {
         updateUI()
       },
       onRuntime: (data) => {
+        serverRuntimeSeen = true
+        clearLocalRuntimeSeedTimers()
         pushRuntimeEntry(data.state, data.message, data.metadata || {})
+        updateUI()
+      },
+      onHeartbeat: () => {
+        refreshActiveRuntimeEntry()
         updateUI()
       },
       onEnd: () => {
         const doFinalRender = async () => {
+          clearLocalRuntimeSeedTimers()
           assistantUpdatePending = false
           thinkingFinalized = true
           stopThinkingTimer()
-          if (!runtimeEntries.some((entry) => entry.state === 'answered' || entry.state === 'failed')) {
+          if (!runtimeEntries.some((entry) => entry.state === 'failed')) {
             if (aiMessageContent.trim()) {
-              pushRuntimeEntry('answered', 'Run completed.', { phase: 'completed' })
+              finalAnswerReady = true
             } else {
               pushRuntimeEntry('failed', 'Run ended without a usable answer.', { phase: 'completed' })
             }
@@ -831,6 +1114,7 @@ async function handleStreamWithSignals(runId, signals, context) {
         }, 200)
       },
       onError: async (error) => {
+        clearLocalRuntimeSeedTimers()
         thinkingFinalized = true
         stopThinkingTimer()
         pushRuntimeEntry('failed', error?.message || 'Unknown error', { phase: 'error' })

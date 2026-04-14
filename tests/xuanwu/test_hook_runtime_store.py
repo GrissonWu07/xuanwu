@@ -5,12 +5,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.xuanwu.hooks.runtime_models import (
+from app.atlasclaw.hooks.runtime_models import (
     HookEventEnvelope,
     HookEventType,
     PendingHookItem,
 )
-from app.xuanwu.hooks.runtime_store import HookStateStore
+from app.atlasclaw.hooks.runtime_store import HookStateStore
 
 
 @pytest.mark.asyncio

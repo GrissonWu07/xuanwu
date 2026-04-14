@@ -7,6 +7,12 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.atlasclaw.auth.guards import (
+    AuthorizationContext,
+    ensure_any_permission,
+    ensure_skill_access,
+    get_authorization_context,
+)
 from .deps_context import APIContext, get_api_context
 from .schemas import (
     MemorySearchRequest,
@@ -19,9 +25,21 @@ from .schemas import (
 def register_skills_memory_routes(router: APIRouter) -> None:
     @router.get("/skills")
     async def list_skills(
+        include_metadata: bool = False,
         ctx: APIContext = Depends(get_api_context),
+        authz: AuthorizationContext = Depends(get_authorization_context),
     ) -> dict[str, Any]:
-        executable_skills = ctx.skill_registry.snapshot_builtins()
+        ensure_any_permission(
+            authz,
+            ("skills.view", "skills.manage_permissions", "rbac.manage_permissions"),
+            detail="Missing permission: skills.view or skills.manage_permissions",
+        )
+
+        executable_skills = (
+            ctx.skill_registry.tools_snapshot()
+            if include_metadata
+            else ctx.skill_registry.snapshot_builtins()
+        )
         md_skills = ctx.skill_registry.md_snapshot()
 
         all_skills = []
@@ -32,15 +50,46 @@ def register_skills_memory_routes(router: APIRouter) -> None:
                     "description": s["description"],
                     "category": s.get("category", "utility"),
                     "type": "executable",
+                    **(
+                        {
+                            "provider_type": s.get("provider_type", ""),
+                            "group_ids": list(s.get("group_ids", []) or []),
+                            "capability_class": s.get("capability_class", ""),
+                            "priority": int(s.get("priority", 100) or 100),
+                            "location": s.get("location", "built-in"),
+                            "source": s.get("source", "builtin"),
+                        }
+                        if include_metadata
+                        else {}
+                    ),
                 },
             )
         for s in md_skills:
+            metadata = s.get("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
             all_skills.append(
                 {
                     "name": s["name"],
                     "description": s["description"],
-                    "category": s.get("metadata", {}).get("category", "skill"),
+                    "category": metadata.get("category", "skill"),
                     "type": "markdown",
+                    **(
+                        {
+                            "provider_type": (
+                                metadata.get("provider_type")
+                                or s.get("provider", "")
+                                or ""
+                            ),
+                            "group_ids": list(metadata.get("group_ids", []) or []),
+                            "capability_class": metadata.get("capability_class", ""),
+                            "priority": int(metadata.get("priority", 100) or 100),
+                            "location": s.get("location", "built-in"),
+                            "file_path": s.get("file_path", ""),
+                        }
+                        if include_metadata
+                        else {}
+                    ),
                 },
             )
 
@@ -50,7 +99,14 @@ def register_skills_memory_routes(router: APIRouter) -> None:
     async def execute_skill(
         request: SkillExecuteRequest,
         ctx: APIContext = Depends(get_api_context),
+        authz: AuthorizationContext = Depends(get_authorization_context),
     ) -> SkillExecuteResponse:
+        ensure_skill_access(
+            authz,
+            request.skill_name,
+            detail=f"Missing permission to execute skill: {request.skill_name}",
+        )
+
         import time
 
         start = time.monotonic()

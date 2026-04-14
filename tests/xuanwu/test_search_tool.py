@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.xuanwu.tools.web.provider_runtime import SearchExecutionResponse
-from app.xuanwu.tools.web.search_tool import web_search_tool
+from app.atlasclaw.tools.web.provider_runtime import SearchExecutionResponse
+from app.atlasclaw.tools.web.search_tool import web_search_tool
 
 
 @pytest.mark.asyncio
@@ -29,9 +29,9 @@ async def test_web_search_tool_uses_runtime_from_project_config(monkeypatch) -> 
         observed["config_default_provider"] = config.default_provider
         return _FakeRuntime()
 
-    monkeypatch.setattr('app.xuanwu.tools.web.search_tool.get_config', fake_get_config)
+    monkeypatch.setattr('app.atlasclaw.tools.web.search_tool.get_config', fake_get_config)
     monkeypatch.setattr(
-        'app.xuanwu.tools.web.search_tool.SearchExecutionRuntime.from_config',
+        'app.atlasclaw.tools.web.search_tool.SearchExecutionRuntime.from_config',
         fake_from_config,
     )
 
@@ -57,9 +57,9 @@ async def test_web_search_tool_passes_provider_override(monkeypatch) -> None:
                 results=[],
             )
 
-    monkeypatch.setattr('app.xuanwu.tools.web.search_tool.get_config', lambda: SimpleNamespace(search_runtime=SimpleNamespace(default_provider='bing_html_fallback')))
+    monkeypatch.setattr('app.atlasclaw.tools.web.search_tool.get_config', lambda: SimpleNamespace(search_runtime=SimpleNamespace(default_provider='bing_html_fallback')))
     monkeypatch.setattr(
-        'app.xuanwu.tools.web.search_tool.SearchExecutionRuntime.from_config',
+        'app.atlasclaw.tools.web.search_tool.SearchExecutionRuntime.from_config',
         lambda _config: _FakeRuntime(),
     )
 
@@ -81,9 +81,9 @@ async def test_web_search_tool_returns_error_when_runtime_fails(monkeypatch) -> 
         async def execute(self, *, query: str, provider_override: str | None, limit: int, require_grounding: bool = False):
             raise RuntimeError("network unreachable")
 
-    monkeypatch.setattr('app.xuanwu.tools.web.search_tool.get_config', lambda: SimpleNamespace(search_runtime=SimpleNamespace(default_provider='bing_html_fallback')))
+    monkeypatch.setattr('app.atlasclaw.tools.web.search_tool.get_config', lambda: SimpleNamespace(search_runtime=SimpleNamespace(default_provider='bing_html_fallback')))
     monkeypatch.setattr(
-        'app.xuanwu.tools.web.search_tool.SearchExecutionRuntime.from_config',
+        'app.atlasclaw.tools.web.search_tool.SearchExecutionRuntime.from_config',
         lambda _config: _FailingRuntime(),
     )
 

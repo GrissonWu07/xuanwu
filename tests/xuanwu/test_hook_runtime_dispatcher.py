@@ -6,14 +6,14 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.xuanwu.hooks.runtime import (
+from app.atlasclaw.hooks.runtime import (
     HookHandlerDefinition,
     HookRuntime,
     HookRuntimeContext,
 )
-from app.xuanwu.hooks.runtime_models import HookDecision, HookEventEnvelope, HookEventType
-from app.xuanwu.hooks.runtime_sinks import ContextSink, MemorySink
-from app.xuanwu.hooks.runtime_store import HookStateStore
+from app.atlasclaw.hooks.runtime_models import HookDecision, HookEventEnvelope, HookEventType
+from app.atlasclaw.hooks.runtime_sinks import ContextSink, MemorySink
+from app.atlasclaw.hooks.runtime_store import HookStateStore
 
 
 @dataclass

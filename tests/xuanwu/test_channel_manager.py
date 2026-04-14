@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import asyncio
+import json
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,10 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.xuanwu.channels import ChannelConnection, ChannelRegistry
-from app.xuanwu.channels.handlers import WebSocketHandler
-from app.xuanwu.channels.models import ConnectionStatus, InboundMessage, SendResult
-from app.xuanwu.channels.manager import ChannelManager
+from app.atlasclaw.channels import ChannelConnection, ChannelRegistry
+from app.atlasclaw.channels.handlers import WebSocketHandler
+from app.atlasclaw.channels.models import ConnectionStatus, InboundMessage, SendResult
+from app.atlasclaw.channels.manager import ChannelManager
+from app.atlasclaw.core.config import get_config_manager
 
 
 class TestChannelManager:
@@ -70,6 +71,7 @@ class TestChannelManager:
             # Base WebSocketHandler.connect() returns False, so initialization fails
             # This is expected - real implementations would override connect()
             assert result is False
+            assert self.manager.get_connection_runtime_status("conn-123") == "error"
 
     @pytest.mark.asyncio
     async def test_initialize_connection_not_found(self):
@@ -283,8 +285,9 @@ class TestChannelManager:
         mock_channel.is_active = True
         mock_channel.is_default = False
         
-        with patch("app.xuanwu.db.get_db_manager") as mock_db_manager, \
-             patch("app.xuanwu.channels.manager.ChannelConfigService") as mock_service:
+        with patch("app.atlasclaw.db.get_db_manager") as mock_db_manager, \
+             patch("app.atlasclaw.channels.manager.ChannelConfigService") as mock_service, \
+             patch("app.atlasclaw.channels.manager.asyncio.create_task") as mock_create_task:
             
             mock_session_instance = AsyncMock()
             mock_db_manager.return_value.get_session.return_value.__aenter__.return_value = mock_session_instance
@@ -298,12 +301,23 @@ class TestChannelManager:
                 "config": {},
                 "enabled": True,
             }
+            scheduled_coroutines = []
+
+            def _capture_task(coroutine):
+                scheduled_coroutines.append(coroutine)
+                coroutine.close()
+                return MagicMock()
+
+            mock_create_task.side_effect = _capture_task
             
             # enable_connection now returns once DB state flips and
             # background initialization has been scheduled.
             result = await self.manager.enable_connection("user-123", "websocket", "conn-123")
             
             assert result is True
+            mock_create_task.assert_called_once()
+            assert len(scheduled_coroutines) == 1
+            assert self.manager.get_connection_runtime_status("conn-123") == "connecting"
 
     @pytest.mark.asyncio
     async def test_disable_connection(self):
@@ -327,6 +341,12 @@ class TestChannelManager:
             result = await self.manager.disable_connection("user-123", "websocket", "conn-123")
             
             assert result is True
+            assert self.manager.get_connection_runtime_status("conn-123") == "disconnected"
+
+    def test_get_connection_runtime_status_uses_cached_state_when_handler_missing(self):
+        self.manager._set_connection_runtime_status("conn-123", ConnectionStatus.CONNECTING)
+
+        assert self.manager.get_connection_runtime_status("conn-123") == "connecting"
 
     def test_build_channel_session_key_uses_sender_for_direct_messages(self):
         message = InboundMessage(
@@ -383,3 +403,99 @@ class TestChannelManager:
 
         assert first_key == second_key
         assert first_key == "agent:main:user:owner-1:dingtalk:conn-1:group:group-42"
+
+    @pytest.mark.asyncio
+    async def test_process_message_async_injects_selected_provider_binding(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        """Channel turns should receive the bound user provider config in deps.extra."""
+        workspace_path = tmp_path / "workspace"
+        user_dir = workspace_path / "users" / "user-123"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        (user_dir / "user_setting.json").write_text(
+            json.dumps(
+                {
+                    "channels": {},
+                    "providers": {
+                        "smartcmp": {
+                            "default": {
+                                "configured": True,
+                                "config": {
+                                    "auth_type": "user_token",
+                                    "user_token": "secret-token",
+                                },
+                                "updated_at": "2026-04-13T10:00:00Z",
+                            }
+                        }
+                    },
+                    "preferences": {},
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        config_path = tmp_path / "atlasclaw.test.json"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "workspace": {"path": str(workspace_path)},
+                    "service_providers": {
+                        "smartcmp": {
+                            "default": {
+                                "base_url": "https://console.smartcmp.cloud",
+                                "auth_type": "user_token",
+                            }
+                        }
+                    },
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setenv("ATLASCLAW_CONFIG", str(config_path))
+        get_config_manager().reload()
+
+        manager = ChannelManager(str(workspace_path))
+        handler = WebSocketHandler({"provider_binding": "smartcmp/default"})
+        handler.send_message = AsyncMock(return_value=SendResult(success=True))
+        manager._active_connections["user-123:websocket:conn-123"] = handler
+
+        captured = {}
+
+        class DummyAgentRunner:
+            async def run(self, **kwargs):
+                captured.update(kwargs)
+                yield SimpleNamespace(type="assistant", content="ok")
+
+        manager._agent_runner = DummyAgentRunner()
+
+        message = InboundMessage(
+            message_id="msg-123",
+            sender_id="ext-user-1",
+            sender_name="External User",
+            chat_id="dm-chat-1",
+            channel_type="websocket",
+            content="hello",
+            metadata={"chat_type": "p2p"},
+        )
+
+        await manager._process_message_async("user-123", "websocket", "conn-123", message)
+
+        deps = captured["deps"]
+        assert deps.extra["provider_type"] == "smartcmp"
+        assert deps.extra["provider_instance_name"] == "default"
+        assert deps.extra["provider_instance"]["provider_type"] == "smartcmp"
+        assert deps.extra["provider_instance"]["instance_name"] == "default"
+        assert deps.extra["provider_instance"]["base_url"] == "https://console.smartcmp.cloud"
+        assert deps.extra["provider_instance"]["user_token"] == "secret-token"
+        assert deps.extra["available_providers"] == {"smartcmp": ["default"]}
+        assert deps.extra["provider_instances"]["smartcmp"]["default"]["user_token"] == "secret-token"
+
+        monkeypatch.delenv("ATLASCLAW_CONFIG", raising=False)
+        get_config_manager().reload()

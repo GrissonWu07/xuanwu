@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.xuanwu.agent.prompt_sections import build_heartbeats
-from app.xuanwu.heartbeat.agent_executor import AgentHeartbeatExecutor
-from app.xuanwu.heartbeat.events import build_heartbeat_event_payload
-from app.xuanwu.heartbeat.models import HeartbeatJobDefinition, HeartbeatJobType
+from app.atlasclaw.agent.prompt_sections import build_heartbeats
+from app.atlasclaw.heartbeat.agent_executor import AgentHeartbeatExecutor
+from app.atlasclaw.heartbeat.events import build_heartbeat_event_payload
+from app.atlasclaw.heartbeat.models import HeartbeatJobDefinition, HeartbeatJobType
 
 
 def test_build_heartbeats_renders_heartbeat_md_content() -> None:

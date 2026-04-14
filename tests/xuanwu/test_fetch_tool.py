@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.xuanwu.tools.web import fetch_tool as fetch_tool_module
-from app.xuanwu.tools.web.fetch_tool import (
+from app.atlasclaw.tools.web import fetch_tool as fetch_tool_module
+from app.atlasclaw.tools.web.fetch_tool import (
     _guarded_get_text_with_proxy_fallback,
     _html_to_text,
     fetch_web_content,
@@ -25,7 +25,7 @@ async def test_web_fetch_tool_returns_content_and_details(monkeypatch) -> None:
             "truncated": False,
         }
 
-    monkeypatch.setattr("app.xuanwu.tools.web.fetch_tool.fetch_web_content", _fake_fetch)
+    monkeypatch.setattr("app.atlasclaw.tools.web.fetch_tool.fetch_web_content", _fake_fetch)
 
     result = await web_fetch_tool(
         ctx=SimpleNamespace(),
@@ -45,7 +45,7 @@ async def test_web_fetch_tool_returns_error_payload_when_fetch_fails(monkeypatch
         _ = kwargs
         raise RuntimeError("connection timeout")
 
-    monkeypatch.setattr("app.xuanwu.tools.web.fetch_tool.fetch_web_content", _failing_fetch)
+    monkeypatch.setattr("app.atlasclaw.tools.web.fetch_tool.fetch_web_content", _failing_fetch)
 
     result = await web_fetch_tool(
         ctx=SimpleNamespace(),
@@ -101,7 +101,7 @@ async def test_fetch_retries_without_proxy_when_proxy_path_fails(monkeypatch) ->
 
     payload, status, final_url, truncated, used_no_proxy = await _guarded_get_text_with_proxy_fallback(
         url="https://example.com",
-        headers={"User-Agent": "XuanWu-Test"},
+        headers={"User-Agent": "AtlasClaw-Test"},
         timeout_seconds=3.0,
         max_redirects=2,
         max_response_bytes=4096,
@@ -129,7 +129,7 @@ async def test_fetch_does_not_retry_without_proxy_when_no_proxy_env(monkeypatch)
     with pytest.raises(RuntimeError, match="proxy failure"):
         await _guarded_get_text_with_proxy_fallback(
             url="https://example.com",
-            headers={"User-Agent": "XuanWu-Test"},
+            headers={"User-Agent": "AtlasClaw-Test"},
             timeout_seconds=3.0,
             max_redirects=2,
             max_response_bytes=4096,

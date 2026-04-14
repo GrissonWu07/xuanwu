@@ -374,11 +374,11 @@ _config_manager: Optional[ConfigManager] = None
 def get_config_manager() -> ConfigManager:
     """get Configuration managerinstance"""
     global _config_manager
-    config_path = os.environ.get("XUANWU_CONFIG") or os.environ.get("XUANWU_CONFIG")
+    config_path = os.environ.get("ATLASCLAW_CONFIG")
     if _config_manager is None:
         _config_manager = ConfigManager(config_path=config_path)
     elif (_config_manager._config_path or None) != (config_path or None):
-        # Rebuild the singleton when tests or runtime update env-based config path.
+        # Rebuild the singleton when tests or runtime update ATLASCLAW_CONFIG.
         _config_manager = ConfigManager(config_path=config_path)
     return _config_manager
 

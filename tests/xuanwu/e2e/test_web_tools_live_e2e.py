@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import os
@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-from app.xuanwu.tools.web.fetch_tool import fetch_web_content
-from app.xuanwu.tools.web.provider_runtime import build_default_search_runtime
+from app.atlasclaw.tools.web.fetch_tool import fetch_web_content
+from app.atlasclaw.tools.web.provider_runtime import build_default_search_runtime
 
 
 async def _fetch_first_non_empty_result(

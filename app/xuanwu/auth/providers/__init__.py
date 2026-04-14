@@ -97,6 +97,10 @@ def create_local_provider(config: AuthConfig) -> AuthProvider:
         from app.xuanwu.auth.providers.none import NoneProvider
         return NoneProvider(default_user_id=config.none.default_user_id)
 
+    if provider_type == "cmp":
+        from app.atlasclaw.auth.providers.cmp import CMPAuthProvider
+        return CMPAuthProvider()
+
     if provider_type == "local":
         from app.xuanwu.auth.providers.local import LocalAuthProvider
         return LocalAuthProvider()
@@ -107,7 +111,7 @@ def create_local_provider(config: AuthConfig) -> AuthProvider:
 
     raise ValueError(
         f"Unknown primary auth provider: {config.provider!r}. "
-        f"Supported: 'none', 'local', 'oidc', 'dingtalk', 'feishu', 'wecom'. "
+        f"Supported: 'none', 'local', 'cmp', 'oidc', 'dingtalk', 'feishu', 'wecom'. "
         f"Note: 'oidc_jwt' is available via get_jwt_validator() for API use cases."
     )
 

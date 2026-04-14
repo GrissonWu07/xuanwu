@@ -3,8 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title data-i18n="login.title">XuanWu Login</title>
-  <link rel="stylesheet" href="/styles/login.css">
+  <title data-i18n="login.title">AtlasClaw Login</title>
+  <script>
+    window.__atlasclawBasePath = __ATLASCLAW_BASE_PATH_JSON__
+    window.__atlasclawBuildUrl = function (path) {
+      const basePath = String(window.__atlasclawBasePath || '').replace(/\/$/, '')
+      const cleanPath = String(path || '/')
+      if (!cleanPath || cleanPath === '/') {
+        return basePath ? `${basePath}/` : '/'
+      }
+      if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://') || cleanPath.startsWith('//')) {
+        return cleanPath
+      }
+      const normalized = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`
+      return `${basePath}${normalized}` || normalized
+    }
+  </script>
+  <link rel="stylesheet" href="__ATLASCLAW_BASE_PATH__/styles/login.css">
 </head>
 <body>
   <main class="login-page">
@@ -16,7 +31,7 @@
             <text x="28" y="32" text-anchor="middle" font-size="28" font-weight="600" fill="white" font-family="Arial, sans-serif">A</text>
           </svg>
         </div>
-        <h1 data-i18n="login.welcome">Welcome to XuanWu</h1>
+        <h1 data-i18n="login.welcome">Welcome to AtlasClaw</h1>
         <p data-i18n="login.subtitle">Login to your account to continue</p>
       </header>
 
@@ -58,8 +73,8 @@
   </main>
 
   <script type="module">
-    import { checkAuth, login } from '/scripts/auth.js'
-    import { initI18n, t, updatePageTranslations } from '/scripts/i18n.js'
+    import { checkAuth, login } from '__ATLASCLAW_BASE_PATH__/scripts/auth.js'
+    import { initI18n, t, updatePageTranslations } from '__ATLASCLAW_BASE_PATH__/scripts/i18n.js'
 
     // Initialize i18n first (non-blocking)
     try {
@@ -84,10 +99,10 @@
 
     // Remember me restoration
     const rememberMeCheckbox = document.getElementById('rememberMe')
-    const savedRemember = localStorage.getItem('xuanwu_remember_me') === 'true'
+    const savedRemember = localStorage.getItem('atlasclaw_remember_me') === 'true'
     if (savedRemember) {
       rememberMeCheckbox.checked = true
-      const savedUsername = localStorage.getItem('xuanwu_saved_username')
+      const savedUsername = localStorage.getItem('atlasclaw_saved_username')
       if (savedUsername) {
         document.getElementById('username').value = savedUsername
       }
@@ -102,7 +117,8 @@
       eyeOff.style.display = isPassword ? '' : 'none'
     })
     const params = new URLSearchParams(window.location.search)
-    const redirect = params.get('redirect') || '/'
+    const fallbackRedirect = window.__atlasclawBuildUrl('/')
+    const redirect = normalizeRedirectTarget(params.get('redirect') || fallbackRedirect)
 
     const already = await checkAuth({ redirect: false })
     if (already) {
@@ -125,11 +141,11 @@
         submitBtn.classList.add('loading')
         await login(username, password)
         if (rememberMeCheckbox.checked) {
-          localStorage.setItem('xuanwu_remember_me', 'true')
-          localStorage.setItem('xuanwu_saved_username', username)
+          localStorage.setItem('atlasclaw_remember_me', 'true')
+          localStorage.setItem('atlasclaw_saved_username', username)
         } else {
-          localStorage.removeItem('xuanwu_remember_me')
-          localStorage.removeItem('xuanwu_saved_username')
+          localStorage.removeItem('atlasclaw_remember_me')
+          localStorage.removeItem('atlasclaw_saved_username')
         }
         window.location.href = redirect
       } catch (error) {
@@ -140,6 +156,24 @@
         submitBtn.textContent = t('login.submit')
       }
     })
+
+    function normalizeRedirectTarget(target) {
+      const value = String(target || '').trim()
+      const basePath = String(window.__atlasclawBasePath || '').replace(/\/$/, '')
+      if (!value) {
+        return fallbackRedirect
+      }
+      if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('//')) {
+        return fallbackRedirect
+      }
+      if (!basePath || value === basePath || value.startsWith(`${basePath}/`)) {
+        return value
+      }
+      if (value.startsWith('/')) {
+        return window.__atlasclawBuildUrl(value)
+      }
+      return window.__atlasclawBuildUrl(`/${value}`)
+    }
   </script>
 </body>
 </html>

@@ -30,7 +30,6 @@ class SSEEventType(Enum):
     HEARTBEAT = "heartbeat"
     THINKING = "thinking"
     RUNTIME = "runtime"
-    SUBAGENT_STATUS = "subagent_status"
 
 
 @dataclass
@@ -134,7 +133,7 @@ SSE manager
     def __init__(
         self,
         *,
-        heartbeat_interval: float = 15.0,
+        heartbeat_interval: float = 5.0,
         stream_timeout: float = 3600.0,
         max_events_buffer: int = 100,
     ) -> None:
@@ -527,39 +526,6 @@ tool
         return self.push_event(run_id, SSEEvent(
             event_type=SSEEventType.RUNTIME,
             data=data,
-        ))
-
-    def push_artifact(
-        self,
-        run_id: str,
-        *,
-        artifact_id: str,
-        name: str,
-        relative_path: str,
-        download_url: str,
-        expires_at: str,
-    ) -> int:
-        """Push a runtime artifact event with signed download metadata."""
-        return self.push_event(run_id, SSEEvent(
-            event_type=SSEEventType.ARTIFACT,
-            data={
-                "id": artifact_id,
-                "name": name,
-                "relative_path": relative_path,
-                "download_url": download_url,
-                "expires_at": expires_at,
-            },
-        ))
-
-    def push_subagent_status(
-        self,
-        stream_id: str,
-        payload: dict[str, Any],
-    ) -> int:
-        """Push a subagent status event to dedicated subagent stream."""
-        return self.push_event(stream_id, SSEEvent(
-            event_type=SSEEventType.SUBAGENT_STATUS,
-            data=dict(payload or {}),
         ))
         
     def get_active_streams(self) -> list[str]:

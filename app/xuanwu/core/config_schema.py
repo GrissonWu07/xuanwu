@@ -7,8 +7,8 @@ from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.xuanwu.heartbeat.models import HeartbeatTargetType
-from app.xuanwu.tools.web.provider_models import SearchProviderConfig
+from app.atlasclaw.heartbeat.models import HeartbeatTargetType
+from app.atlasclaw.tools.web.provider_models import SearchProviderConfig
 
 # Auth config is imported lazily to avoid circular imports at module load time.
 # AuthConfig is referenced only in XuanWuConfig.auth field annotation.
@@ -93,6 +93,42 @@ class CompactionConfig(BaseModel):
     memory_flush_enabled: bool = True
 
 
+class ContextPruningToolConfig(BaseModel):
+    """Tool allow/deny rules for context pruning candidates."""
+
+    allow: list[str] = Field(default_factory=list)
+    deny: list[str] = Field(default_factory=list)
+
+
+class ContextPruningSoftTrimConfig(BaseModel):
+    """Soft-trim settings for oversized tool payloads."""
+
+    max_chars: int = Field(default=4_000, ge=1)
+    head_chars: int = Field(default=1_500, ge=1)
+    tail_chars: int = Field(default=1_500, ge=1)
+
+
+class ContextPruningHardClearConfig(BaseModel):
+    """Hard-clear settings for severe context pressure."""
+
+    enabled: bool = True
+    placeholder: str = Field(default="[Tool result cleared to save context space]")
+
+
+class ContextPruningConfig(BaseModel):
+    """Runtime context pruning configuration (OpenClaw-aligned)."""
+
+    mode: str = Field(default="cache-ttl", description="off | cache-ttl")
+    ttl_ms: int = Field(default=5 * 60 * 1000, ge=0)
+    keep_last_assistants: int = Field(default=3, ge=0)
+    soft_trim_ratio: float = Field(default=0.30, ge=0, le=1)
+    hard_clear_ratio: float = Field(default=0.50, ge=0, le=1)
+    min_prunable_tool_chars: int = Field(default=50_000, ge=0)
+    tools: ContextPruningToolConfig = Field(default_factory=ContextPruningToolConfig)
+    soft_trim: ContextPruningSoftTrimConfig = Field(default_factory=ContextPruningSoftTrimConfig)
+    hard_clear: ContextPruningHardClearConfig = Field(default_factory=ContextPruningHardClearConfig)
+
+
 class BlockChunkerConfig(BaseModel):
     """Streaming block chunking configuration."""
     min_chars: int = Field(default=800, ge=1, description="Minimum chunk size in characters")
@@ -128,7 +164,18 @@ class SkillsConfig(BaseModel):
     md_skills_max_count: int = Field(default=20, ge=1, description="Maximum number of MD skills shown in the index section")
     md_skills_desc_max_chars: int = Field(default=200, ge=1, description="Maximum characters for a single skill description")
     md_skills_index_max_chars: int = Field(default=3000, ge=1, description="Maximum total characters for the index section")
+    capability_index_max_count: int = Field(default=20, ge=1, description="Maximum number of unified capability entries shown in the capability index section")
+    capability_index_desc_max_chars: int = Field(default=200, ge=1, description="Maximum characters for a single capability description")
+    capability_index_max_chars: int = Field(default=3000, ge=1, description="Maximum total characters for the unified capability index section")
     md_skills_max_file_bytes: int = Field(default=262144, ge=1, description="Maximum size of a single SKILL.md file in bytes (default 256KB)")
+    tools_exclusive: list[str] = Field(
+        default_factory=list,
+        description="Built-in tools or tool groups to exclude at startup registration time",
+    )
+    allow_script_execution: bool = Field(
+        default=True,
+        description="Whether high-risk built-in filesystem and exec tools may be registered",
+    )
 
 
 class HookScriptHandlerConfig(BaseModel):
@@ -147,33 +194,6 @@ class HooksRuntimeConfig(BaseModel):
     """Hook runtime extension configuration."""
 
     script_handlers: list[HookScriptHandlerConfig] = Field(default_factory=list)
-
-
-class ToolGateConfig(BaseModel):
-    """Tool-necessity gate runtime configuration."""
-
-    enable_model_classifier: bool = Field(
-        default=True,
-        description=(
-            "Whether the runtime may perform a dedicated model-backed classification pass "
-            "before the primary answer run. Enabled by default to reduce long reasoning-only "
-            "loops for tool-required requests."
-        ),
-    )
-
-
-class SubagentRuntimeConfig(BaseModel):
-    """Subagent runtime safety and scheduling configuration."""
-
-    max_spawn_depth: int = Field(default=1, ge=1)
-    max_children_per_session: int = Field(default=2, ge=1)
-    max_concurrent_subagents: int = Field(default=8, ge=1)
-    default_timeout_seconds: int = Field(default=900, ge=0)
-    steer_rate_limit_ms: int = Field(default=2000, ge=0)
-    max_queued_batches_per_controller: int = Field(default=1, ge=0)
-    stalled_after_seconds: int = Field(default=180, ge=30)
-    retention_seconds: int = Field(default=3600, ge=300)
-    sweep_interval_seconds: int = Field(default=60, ge=5)
 
 
 class SearchProxyConfig(BaseModel):
@@ -389,11 +409,16 @@ class DatabaseConfig(BaseModel):
 class UserConfig(BaseModel):
     """User-specific configuration stored in users/<id>/user_setting.json
     
-    Note: providers are system-level configuration, not user-level.
+    System provider templates stay in atlasclaw.json. This section stores the
+    authenticated user's personal credentials bound to those templates.
     """
     channels: dict[str, Any] = Field(
         default_factory=dict,
         description="User-level channel configurations (e.g., Feishu bot, DingTalk bot)"
+    )
+    providers: dict[str, Any] = Field(
+        default_factory=dict,
+        description="User-level provider credentials bound to system provider templates"
     )
     preferences: dict[str, Any] = Field(
         default_factory=dict,
@@ -404,6 +429,13 @@ class UserConfig(BaseModel):
 class XuanWuConfig(BaseModel):
     """XuanWu configuration"""
     log_level: LogLevel = LogLevel.INFO
+    base_path: str = Field(
+        default="",
+        description=(
+            "Optional reverse-proxy mount path such as '/atlasclaw'. "
+            "Leave empty when AtlasClaw is served from the site root."
+        ),
+    )
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig, description="Workspace configuration")
     database: Optional[DatabaseConfig] = Field(default=None, description="Database configuration")
     agents_dir: str = Field(default="~/.xuanwu/agents", description="Agent directory (backward compatibility)")
@@ -424,6 +456,7 @@ class XuanWuConfig(BaseModel):
     agent_defaults: AgentDefaultsConfig = Field(default_factory=AgentDefaultsConfig)
     messages: MessagesConfig = Field(default_factory=MessagesConfig)
     compaction: CompactionConfig = Field(default_factory=CompactionConfig)
+    context_pruning: ContextPruningConfig = Field(default_factory=ContextPruningConfig)
     block_chunker: BlockChunkerConfig = Field(default_factory=BlockChunkerConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     retry: RetryConfig = Field(default_factory=RetryConfig)
@@ -434,8 +467,6 @@ class XuanWuConfig(BaseModel):
     reset: ResetConfig = Field(default_factory=ResetConfig)
     webhook: WebhookConfig = Field(default_factory=WebhookConfig)
     hooks_runtime: HooksRuntimeConfig = Field(default_factory=HooksRuntimeConfig)
-    tool_gate: ToolGateConfig = Field(default_factory=ToolGateConfig)
-    subagent_runtime: SubagentRuntimeConfig = Field(default_factory=SubagentRuntimeConfig)
     search_runtime: SearchRuntimeConfig = Field(default_factory=SearchRuntimeConfig)
     heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
 

@@ -20,19 +20,19 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.xuanwu.api.api_routes import router as api_router
-from app.xuanwu.api.routes import APIContext, create_router, set_api_context
-from app.xuanwu.auth.guards import get_current_user
-from app.xuanwu.auth.models import UserInfo
-from app.xuanwu.auth.config import AuthConfig
-from app.xuanwu.auth.middleware import setup_auth_middleware
-from app.xuanwu.db import get_db_session
-from app.xuanwu.db.database import DatabaseConfig, DatabaseManager, init_database
-from app.xuanwu.db.orm.user import UserService
-from app.xuanwu.db.schemas import UserCreate
-from app.xuanwu.session.manager import SessionManager
-from app.xuanwu.session.queue import SessionQueue
-from app.xuanwu.skills.registry import SkillRegistry
+from app.atlasclaw.api.api_routes import router as api_router
+from app.atlasclaw.api.routes import APIContext, create_router, set_api_context
+from app.atlasclaw.auth.guards import get_current_user
+from app.atlasclaw.auth.models import UserInfo
+from app.atlasclaw.auth.config import AuthConfig
+from app.atlasclaw.auth.middleware import setup_auth_middleware
+from app.atlasclaw.db import get_db_session
+from app.atlasclaw.db.database import DatabaseConfig, DatabaseManager, init_database
+from app.atlasclaw.db.orm.user import UserService
+from app.atlasclaw.db.schemas import UserCreate
+from app.atlasclaw.session.manager import SessionManager
+from app.atlasclaw.session.queue import SessionQueue
+from app.atlasclaw.skills.registry import SkillRegistry
 
 
 # Global reference to db manager for tests
@@ -92,7 +92,6 @@ def _init_database_sync(tmp_path: Path):
                     email="testuser@test.com",
                     roles={"user": True},
                     auth_type="local",
-                    is_admin=False,
                     is_active=True,
                 ),
             )
@@ -106,7 +105,6 @@ def _init_database_sync(tmp_path: Path):
                     email="other@test.com",
                     roles={},
                     auth_type="local",
-                    is_admin=False,
                     is_active=True,
                 ),
             )
@@ -306,13 +304,13 @@ class TestUserProfileAPI:
         workspace_path.mkdir(parents=True, exist_ok=True)
 
         with patch(
-            "app.xuanwu.api.api_routes.get_config",
+            "app.atlasclaw.api.api_routes.get_config",
             return_value=SimpleNamespace(workspace=SimpleNamespace(path=str(workspace_path))),
         ):
             resp = client.post(
                 "/api/users/me/avatar",
                 files={"avatar": ("avatar.png", b"fake-png-data", "image/png")},
-                headers={"XuanWu-Authenticate": token},
+                headers={"AtlasClaw-Authenticate": token},
             )
 
         assert resp.status_code == 200
@@ -333,13 +331,13 @@ class TestUserProfileAPI:
         workspace_path.mkdir(parents=True, exist_ok=True)
 
         with patch(
-            "app.xuanwu.api.api_routes.get_config",
+            "app.atlasclaw.api.api_routes.get_config",
             return_value=SimpleNamespace(workspace=SimpleNamespace(path=str(workspace_path))),
         ):
             resp = client.post(
                 "/api/users/me/avatar",
                 files={"avatar": ("avatar.txt", b"not-an-image", "text/plain")},
-                headers={"XuanWu-Authenticate": token},
+                headers={"AtlasClaw-Authenticate": token},
             )
 
         assert resp.status_code == 400
@@ -384,7 +382,7 @@ class TestUserProfileAPI:
         client = TestClient(app)
 
         with patch(
-            "app.xuanwu.api.api_routes.get_config",
+            "app.atlasclaw.api.api_routes.get_config",
             return_value=SimpleNamespace(workspace=SimpleNamespace(path=str(workspace_path))),
         ):
             resp = client.get("/api/users/me/profile")
@@ -395,6 +393,56 @@ class TestUserProfileAPI:
         assert data["username"] == "sso-user@example.com"
         assert data["display_name"] == "SSO User"
         assert data["auth_type"] == "oidc:test"
+
+    def test_get_federated_profile_prefers_db_user_by_external_subject(self, tmp_path):
+        """Federated accounts should resolve DB-managed profiles via the external subject."""
+        manager = _init_database_sync(tmp_path)
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir(parents=True, exist_ok=True)
+
+        async def _create_federated_user():
+            async with _test_db_manager.get_session() as session:
+                await UserService.create(
+                    session,
+                    UserCreate(
+                        username="sso-user@example.com",
+                        password=None,
+                        display_name="Workspace SSO User",
+                        email="sso-user@example.com",
+                        roles={"viewer": True},
+                        auth_type="oidc:test",
+                        is_active=True,
+                    ),
+                )
+
+        asyncio.run(_create_federated_user())
+
+        app = FastAPI()
+        app.include_router(api_router)
+        app.dependency_overrides[get_current_user] = lambda: UserInfo(
+            user_id="shadow-user-1",
+            display_name="SSO User",
+            auth_type="oidc:test",
+            roles=["user"],
+            extra={"external_subject": "sso-user@example.com"},
+        )
+
+        client = TestClient(app)
+
+        with patch(
+            "app.atlasclaw.api.api_routes.get_config",
+            return_value=SimpleNamespace(workspace=SimpleNamespace(path=str(workspace_path))),
+        ):
+            resp = client.get("/api/users/me/profile")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["username"] == "sso-user@example.com"
+        assert data["display_name"] == "Workspace SSO User"
+        assert data["email"] == "sso-user@example.com"
+        assert data["roles"]["viewer"] is True
+
+        _cleanup_manager(manager)
 
     def test_update_profile_unavailable_for_federated_account(self, tmp_path):
         """Federated accounts cannot use local-only profile mutation endpoints."""
@@ -414,6 +462,112 @@ class TestUserProfileAPI:
 
         assert resp.status_code == 400
         assert "federated" in resp.json()["detail"].lower()
+
+        _cleanup_manager(manager)
+
+    def test_get_my_provider_settings_reads_user_setting_json(self, tmp_path):
+        """Authenticated users can read their own provider settings from user_setting.json."""
+        manager = _init_database_sync(tmp_path)
+        client = _build_client(tmp_path, _get_auth_config())
+        token = _login_as(client, "testuser", "testpass123")
+        workspace_path = tmp_path / "workspace"
+        user_dir = workspace_path / "users" / "testuser"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        (user_dir / "user_setting.json").write_text(
+            json.dumps(
+                {
+                    "channels": {},
+                    "providers": {
+                        "smartcmp": {
+                            "default": {
+                                "configured": True,
+                                "config": {
+                                    "auth_type": "user_token",
+                                    "user_token": "secret-token",
+                                },
+                                "updated_at": "2026-04-13T10:00:00Z",
+                            }
+                        }
+                    },
+                    "preferences": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "app.atlasclaw.api.api_routes.get_config",
+            return_value=SimpleNamespace(workspace=SimpleNamespace(path=str(workspace_path))),
+        ):
+            resp = client.get(
+                "/api/users/me/provider-settings",
+                headers={"AtlasClaw-Authenticate": token},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["providers"]["smartcmp"]["default"]["configured"] is True
+        assert data["providers"]["smartcmp"]["default"]["config"]["user_token"] == "secret-token"
+
+        _cleanup_manager(manager)
+
+    def test_put_my_provider_settings_persists_user_token_without_mutating_template_url(self, tmp_path):
+        """Authenticated users can save personal provider credentials without storing base_url."""
+        manager = _init_database_sync(tmp_path)
+        client = _build_client(tmp_path, _get_auth_config())
+        token = _login_as(client, "testuser", "testpass123")
+        workspace_path = tmp_path / "workspace"
+        workspace_path.mkdir(parents=True, exist_ok=True)
+
+        config_path = tmp_path / "atlasclaw.json"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "workspace": {"path": str(workspace_path)},
+                    "service_providers": {
+                        "smartcmp": {
+                            "default": {
+                                "base_url": "https://console.smartcmp.cloud",
+                                "auth_type": "user_token",
+                            }
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "app.atlasclaw.api.api_routes.get_config",
+            return_value=SimpleNamespace(
+                workspace=SimpleNamespace(path=str(workspace_path)),
+                service_providers={
+                    "smartcmp": {
+                        "default": {
+                            "base_url": "https://console.smartcmp.cloud",
+                            "auth_type": "user_token",
+                        }
+                    }
+                },
+            ),
+        ):
+            resp = client.put(
+                "/api/users/me/provider-settings",
+                json={
+                    "provider_type": "smartcmp",
+                    "instance_name": "default",
+                    "config": {
+                        "auth_type": "user_token",
+                        "user_token": "secret-token",
+                    },
+                },
+                headers={"AtlasClaw-Authenticate": token},
+            )
+
+        assert resp.status_code == 200
+        saved = json.loads((workspace_path / "users" / "testuser" / "user_setting.json").read_text(encoding="utf-8"))
+        assert saved["providers"]["smartcmp"]["default"]["config"]["user_token"] == "secret-token"
+        assert "base_url" not in saved["providers"]["smartcmp"]["default"]["config"]
 
         _cleanup_manager(manager)
 

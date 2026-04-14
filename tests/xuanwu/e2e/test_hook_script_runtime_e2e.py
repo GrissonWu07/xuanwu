@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.xuanwu.api.deps_context import get_api_context
-from app.xuanwu.hooks.runtime_models import HookEventType
+from app.atlasclaw.api.deps_context import get_api_context
+from app.atlasclaw.hooks.runtime_models import HookEventType
 
 
 def _create_script_hook_e2e_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -49,14 +49,14 @@ print(json.dumps({
     )
 
     db_path = tmp_path / "hook-script-runtime-e2e.db"
-    config_path = tmp_path / "xuanwu.hook-script-runtime.e2e.json"
+    config_path = tmp_path / "atlasclaw.hook-script-runtime.e2e.json"
     config = {
         "workspace": {
-            "path": str((tmp_path / ".xuanwu-script-e2e").resolve()),
+            "path": str((tmp_path / ".atlasclaw-script-e2e").resolve()),
         },
-        "providers_root": "./app/xuanwu/providers",
-        "skills_root": "./app/xuanwu/skills",
-        "channels_root": "./app/xuanwu/channels",
+        "providers_root": "./app/atlasclaw/providers",
+        "skills_root": "./app/atlasclaw/skills",
+        "channels_root": "./app/atlasclaw/channels",
         "database": {
             "type": "sqlite",
             "sqlite": {
@@ -68,9 +68,9 @@ print(json.dumps({
             "provider": "local",
             "jwt": {
                 "secret_key": "script-hook-e2e-secret",
-                "issuer": "xuanwu-script-hook-e2e",
-                "header_name": "XuanWu-Authenticate",
-                "cookie_name": "XuanWu-Authenticate",
+                "issuer": "atlasclaw-script-hook-e2e",
+                "header_name": "AtlasClaw-Authenticate",
+                "cookie_name": "AtlasClaw-Authenticate",
                 "expires_minutes": 60,
             },
             "local": {
@@ -111,10 +111,10 @@ print(json.dumps({
     }
 
     config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
-    monkeypatch.setenv("XUANWU_CONFIG", str(config_path.resolve()))
+    monkeypatch.setenv("ATLASCLAW_CONFIG", str(config_path.resolve()))
 
-    import app.xuanwu.core.config as config_module
-    from app.xuanwu.main import create_app
+    import app.atlasclaw.core.config as config_module
+    from app.atlasclaw.main import create_app
 
     old_config_manager = config_module._config_manager
     config_module._config_manager = config_module.ConfigManager(config_path=str(config_path.resolve()))
@@ -137,7 +137,7 @@ def test_script_hook_handler_consumes_aggregated_context_event(
             )
             assert login_resp.status_code == 200
             token = login_resp.json()["token"]
-            headers = {"XuanWu-Authenticate": token}
+            headers = {"AtlasClaw-Authenticate": token}
 
             ctx = get_api_context()
             assert ctx.hook_runtime is not None
@@ -175,7 +175,7 @@ def test_script_hook_handler_consumes_aggregated_context_event(
             assert len(pending_resp.json()) == 1
             assert pending_resp.json()[0]["payload"]["body"] == "world"
 
-            memory_dir = tmp_path / ".xuanwu-script-e2e" / "users" / "admin" / "memory"
+            memory_dir = tmp_path / ".atlasclaw-script-e2e" / "users" / "admin" / "memory"
             memory_files = list(memory_dir.glob("memory_*.md"))
             assert len(memory_files) == 1
             assert "Remember aggregated context output" in memory_files[0].read_text(encoding="utf-8")

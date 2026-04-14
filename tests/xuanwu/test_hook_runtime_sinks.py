@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.xuanwu.hooks.runtime_models import HookWriteMemoryRequest, PendingHookItem
-from app.xuanwu.hooks.runtime_sinks import ContextSink, MemorySink
-from app.xuanwu.hooks.runtime_store import HookStateStore
+from app.atlasclaw.hooks.runtime_models import HookWriteMemoryRequest, PendingHookItem
+from app.atlasclaw.hooks.runtime_sinks import ContextSink, MemorySink
+from app.atlasclaw.hooks.runtime_store import HookStateStore
 
 
 @pytest.mark.asyncio

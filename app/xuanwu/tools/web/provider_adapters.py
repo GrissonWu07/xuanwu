@@ -14,14 +14,14 @@ from xml.etree import ElementTree
 
 import httpx
 
-from app.xuanwu.tools.web.provider_models import (
+from app.atlasclaw.tools.web.provider_models import (
     GroundedSearchResponse,
     NormalizedSearchResult,
     SearchCitation,
     SearchProviderCapabilities,
     SearchProviderType,
 )
-from app.xuanwu.tools.web.text_codec import decode_http_text
+from app.atlasclaw.tools.web.text_codec import decode_http_text
 
 LOGGER = logging.getLogger(__name__)
 
@@ -248,7 +248,7 @@ class OpenRouterGroundingProvider(BaseSearchProviderAdapter):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://atlasclaw.local",
-            "X-Title": "XuanWu Web Grounding",
+            "X-Title": "AtlasClaw Web Grounding",
         }
         response_json = await self._post_json(
             url=f"{self.base_url}/chat/completions",

@@ -19,13 +19,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Optional
 
-from app.xuanwu.agent.routing import AgentConfig, AgentRouter, RoutingContext
-from app.xuanwu.agent.runner import AgentRunner
-from app.xuanwu.agent.stream import StreamEvent
-from app.xuanwu.auth.models import ANONYMOUS_USER, UserInfo
-from app.xuanwu.core.deps import SkillDeps
-from app.xuanwu.session.manager import SessionManager
-from app.xuanwu.skills.registry import SkillMetadata, SkillRegistry
+from app.atlasclaw.agent.routing import AgentConfig, AgentRouter, RoutingContext
+from app.atlasclaw.agent.runner import AgentRunner
+from app.atlasclaw.agent.stream import StreamEvent
+from app.atlasclaw.auth.models import ANONYMOUS_USER, UserInfo
+from app.atlasclaw.core.deps import SkillDeps
+from app.atlasclaw.core.trace import enrich_trace_metadata
+from app.atlasclaw.session.manager import SessionManager
+from app.atlasclaw.skills.registry import SkillMetadata, SkillRegistry
 
 if TYPE_CHECKING:
     from pydantic_ai import Agent
@@ -94,7 +95,7 @@ class AgentFactory:
         )
 
         for meta, handler in allowed_skills:
-            agent.tool(handler, name=meta.name)
+            self.skill_registry.register_entry_to_agent(agent, meta, handler)
 
         instance = AgentInstance(
             config=config,
@@ -286,7 +287,7 @@ class RequestOrchestrator:
                 peer_id=peer_id,
                 session_key=session_key,
                 channel=channel,
-                extra=deps_extra,
+                extra=enrich_trace_metadata(session_key, extra=deps_extra),
             )
 
             runner = AgentRunner(

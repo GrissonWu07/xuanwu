@@ -39,8 +39,8 @@ async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
     async with httpx.AsyncClient(base_url=TEST_SERVER_URL, timeout=60.0) as c:
         try:
             await c.get("/api/health")
-        except httpx.HTTPError as exc:
-            pytest.skip(f"E2E server is unavailable at {TEST_SERVER_URL}: {exc}")
+        except httpx.HTTPError:
+            pytest.skip(f"E2E server is not reachable at {TEST_SERVER_URL}")
         yield c
 
 
