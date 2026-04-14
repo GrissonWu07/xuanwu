@@ -6,21 +6,37 @@
  * - updateHeaderTitle(titleKey) - Update page title using i18n key
  */
 import { t } from '../i18n.js'
+import { buildAppUrl } from '../config.js'
 import { logout } from '../auth.js'
+import {
+  canAccessChannelManagement,
+  canAccessModelManagement,
+  canAccessProviderManagement,
+  canAccessRoleManagement,
+  canAccessUserManagement
+} from '../permissions.js'
 
+// Store reference to header element for updates
 let headerElement = null
 let titleElement = null
 let dropdownAbortController = null
 let currentHeaderAuthInfo = null
 
+// SVG Icons
 const ICONS = {
   account: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="5"/></svg>',
   models: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>',
+  providers: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H4"/><path d="M20 12H4"/><path d="M20 17H4"/><circle cx="8" cy="7" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
   channels: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   users: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  newChat: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 14.5a2.5 2.5 0 0 1-2.5 2.5H8l-5 4V5.5A2.5 2.5 0 0 1 5.5 3h8"/><path d="M18 3v6"/><path d="M15 6h6"/></svg>',
+  roles: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 5 3.4 8.6 7 9 3.6-.4 7-4 7-9V6l-7-3Z"/><path d="m9.5 12 1.7 1.7 3.8-4"/></svg>',
   logout: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
 }
 
+/**
+ * Cleanup dropdown event listeners
+ */
 function cleanupDropdownListeners() {
   if (dropdownAbortController) {
     dropdownAbortController.abort()
@@ -28,7 +44,11 @@ function cleanupDropdownListeners() {
   }
 }
 
-export function renderHeader(container, { authInfo } = {}) {
+/**
+ * Render header into container
+ * @param {HTMLElement} container - Container element
+ */
+export function renderHeader(container, { authInfo, embeddedMode = isEmbeddedMode() } = {}) {
   if (!container) {
     console.warn('[Header] No container provided')
     return
@@ -41,13 +61,26 @@ export function renderHeader(container, { authInfo } = {}) {
   const displayName = currentHeaderAuthInfo.display_name || currentHeaderAuthInfo.username || 'User'
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U'
   const isAdmin = currentHeaderAuthInfo.is_admin === true
+  const newChatLabel = translateOrFallback('app.newChat', 'New Chat')
+  const canAccessUsers = canAccessUserManagement(currentHeaderAuthInfo)
+  const canAccessRoles = canAccessRoleManagement(currentHeaderAuthInfo)
+  const canAccessModels = canAccessModelManagement(currentHeaderAuthInfo)
+  const canAccessProviders = canAccessProviderManagement(currentHeaderAuthInfo)
+  const canAccessChannels = canAccessChannelManagement(currentHeaderAuthInfo)
+  const hasAdminNavigation = canAccessUsers || canAccessRoles || canAccessModels || canAccessProviders || canAccessChannels
   const roleText = isAdmin
     ? translateOrFallback('user.roleAdmin', 'Administrator')
     : translateOrFallback('user.roleUser', 'User')
 
   container.innerHTML = `
-    <div class="chat-header-spacer" aria-hidden="true"></div>
-    <h1 id="page-title" class="chat-header-title" data-i18n="app.title">XuanWu</h1>
+    <div class="chat-header-leading">
+      ${embeddedMode ? `
+      <a href="${buildAppUrl('/')}" class="embedded-new-chat-btn" data-new-chat aria-label="${escapeHtml(newChatLabel)}" title="${escapeHtml(newChatLabel)}">
+        ${ICONS.newChat}
+      </a>
+      ` : ''}
+    </div>
+    <h1 id="page-title" class="chat-header-title" data-i18n="app.title">AtlasClaw</h1>
     <div class="header-actions">
       <div class="user-menu-container">
         <button class="user-avatar-btn" id="userAvatarBtn" title="${escapeHtml(displayName)}">
@@ -59,20 +92,26 @@ export function renderHeader(container, { authInfo } = {}) {
             <span class="dropdown-role">${escapeHtml(roleText)}</span>
           </div>
           <div class="dropdown-divider"></div>
-          <a href="/account" class="dropdown-item" data-nav-link>
+          <a href="${buildAppUrl('/account')}" class="dropdown-item" data-nav-link>
             ${ICONS.account} ${translateOrFallback('nav.account', 'Account Settings')}
           </a>
-          ${isAdmin ? `
+          ${hasAdminNavigation ? `
           <div class="dropdown-divider" data-admin-only></div>
-          <a href="/admin/users" class="dropdown-item" data-admin-only data-nav-link>
+          ${canAccessUsers ? `<a href="${buildAppUrl('/admin/users')}" class="dropdown-item" data-admin-only data-nav-link>
             ${ICONS.users} ${translateOrFallback('nav.users', 'User Management')}
-          </a>
-          <a href="/models" class="dropdown-item" data-admin-only data-nav-link>
+          </a>` : ''}
+          ${canAccessRoles ? `<a href="${buildAppUrl('/admin/roles')}" class="dropdown-item" data-admin-only data-nav-link>
+            ${ICONS.roles} ${translateOrFallback('nav.roles', 'Role Management')}
+          </a>` : ''}
+          ${canAccessModels ? `<a href="${buildAppUrl('/models')}" class="dropdown-item" data-admin-only data-nav-link>
             ${ICONS.models} ${translateOrFallback('nav.models', 'Model Management')}
-          </a>
-          <a href="/channels" class="dropdown-item" data-admin-only data-nav-link>
+          </a>` : ''}
+          ${canAccessProviders ? `<a href="${buildAppUrl('/providers')}" class="dropdown-item" data-admin-only data-nav-link>
+            ${ICONS.providers} ${translateOrFallback('nav.providers', 'Provider Configuration')}
+          </a>` : ''}
+          ${canAccessChannels ? `<a href="${buildAppUrl('/channels')}" class="dropdown-item" data-admin-only data-nav-link>
             ${ICONS.channels} ${translateOrFallback('nav.channels', 'Channel Management')}
-          </a>
+          </a>` : ''}
           ` : ''}
           <div class="dropdown-divider"></div>
           <a class="dropdown-item dropdown-item-danger" id="btnLogout">
@@ -87,6 +126,9 @@ export function renderHeader(container, { authInfo } = {}) {
   setupDropdownListeners()
 }
 
+/**
+ * Setup dropdown menu event listeners
+ */
 function setupDropdownListeners() {
   const avatarBtn = document.getElementById('userAvatarBtn')
   const dropdown = document.getElementById('userDropdown')
@@ -183,22 +225,32 @@ export function updateHeaderTitle(titleKey) {
   }
   if (!titleElement) return
 
-  titleElement.setAttribute('data-i18n', titleKey)
-  const translated = t(titleKey)
-  if (translated && translated !== titleKey) {
-    titleElement.textContent = translated
-  } else {
-    titleElement.textContent = getDefaultTitle(titleKey)
+  if (titleElement) {
+    titleElement.setAttribute('data-i18n', titleKey)
+
+    const translated = t(titleKey)
+    if (translated && translated !== titleKey) {
+      titleElement.textContent = translated
+    } else {
+      titleElement.textContent = getDefaultTitle(titleKey)
+    }
+
+    document.title = `${titleElement.textContent} - AtlasClaw`
   }
-  document.title = `${titleElement.textContent} - XuanWu`
 }
 
+/**
+ * Get default title for i18n key (fallback before translations load)
+ * @param {string} key - i18n key
+ * @returns {string}
+ */
 function getDefaultTitle(key) {
   const defaults = {
     'app.title': 'XuanWu',
     'app.chatTitle': 'Chat',
     'account.title': 'Account Settings',
     'channel.title': 'Channel Management',
+    'provider.title': 'Authentication Configuration',
     'model.pageTitle': 'Model Management',
     'admin.title': 'User Management',
     'app.channels': 'Channels',
@@ -211,6 +263,9 @@ export function getHeaderElement() {
   return headerElement
 }
 
+/**
+ * Cleanup header resources
+ */
 export function cleanupHeader() {
   cleanupDropdownListeners()
 }
@@ -244,4 +299,16 @@ function renderUserAvatar(authInfo, displayName, initial) {
   }
 
   return `<span class="user-avatar user-avatar-text">${escapeHtml(initial)}</span>`
+}
+
+function isEmbeddedMode() {
+  if (typeof window.__atlasclawEmbeddedMode === 'boolean') {
+    return window.__atlasclawEmbeddedMode
+  }
+
+  try {
+    return window.self !== window.top
+  } catch (error) {
+    return true
+  }
 }

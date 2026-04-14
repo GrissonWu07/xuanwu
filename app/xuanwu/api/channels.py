@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -209,6 +209,8 @@ async def create_connection(
     channel_type: str,
     data: ConnectionCreateRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
+    manager: ChannelManager = Depends(get_channel_manager),
     session: AsyncSession = Depends(get_db_session)
 ) -> ConnectionResponse:
     """Create a new channel connection.
@@ -240,6 +242,16 @@ async def create_connection(
     
     # Decrypt config for response
     config = _decrypt_config(channel.config)
+
+    # Auto-start connection if enabled at creation time.
+    if channel.is_active:
+        logger.info("Auto-starting new connection: %s/%s/%s", user_id, channel_type, channel.id)
+        background_tasks.add_task(
+            manager._background_initialize,
+            user_id,
+            channel_type,
+            channel.id,
+        )
     
     return ConnectionResponse(
         id=channel.id,

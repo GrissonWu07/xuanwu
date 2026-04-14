@@ -4,9 +4,10 @@
  * Personal account profile and security settings for SPA architecture.
  */
 
-import { getCurrentLocale, t, updateContainerTranslations } from '../i18n.js'
+import { getCurrentLocale, t, translateIfExists, updateContainerTranslations } from '../i18n.js'
 import { showToast } from '../components/toast.js'
 import { checkAuth } from '../auth.js'
+import { buildAssetUrl } from '../config.js'
 
 const ACCOUNT_UI_PREFS_KEY = 'atlasclaw_account_ui_preferences'
 
@@ -318,16 +319,71 @@ function formatStatus(isActive) {
     : translateOrFallback('account.statusActive', 'Active')
 }
 
+function getAssignedRoleIdentifiers(profile = {}) {
+  const roleIdentifiers = new Set()
+
+  if (Array.isArray(profile.roles)) {
+    profile.roles.forEach(role => {
+      const identifier = String(role || '').trim()
+      if (identifier) {
+        roleIdentifiers.add(identifier)
+      }
+    })
+  } else if (profile.roles && typeof profile.roles === 'object') {
+    Object.entries(profile.roles).forEach(([identifier, enabled]) => {
+      if (enabled) {
+        roleIdentifiers.add(String(identifier).trim())
+      }
+    })
+  }
+
+  if (profile.is_admin) {
+    roleIdentifiers.add('admin')
+  }
+
+  const priorities = ['admin', 'viewer', 'user']
+  return Array.from(roleIdentifiers).sort((left, right) => {
+    const leftIndex = priorities.indexOf(left)
+    const rightIndex = priorities.indexOf(right)
+
+    if (leftIndex === -1 && rightIndex === -1) {
+      return left.localeCompare(right)
+    }
+    if (leftIndex === -1) return 1
+    if (rightIndex === -1) return -1
+    return leftIndex - rightIndex
+  })
+}
+
+function getRoleDisplayLabel(identifier) {
+  if (!identifier) {
+    return ''
+  }
+
+  return (
+    translateIfExists(`roles.builtinRoleCatalog.${identifier}.name`)
+    || (identifier === 'admin' ? translateOrFallback('user.roleAdmin', 'Administrator') : '')
+    || (identifier === 'viewer' ? translateOrFallback('admin.roleViewer', 'Viewer') : '')
+    || (identifier === 'user' ? translateOrFallback('admin.roleUser', 'User') : '')
+    || identifier
+  )
+}
+
+function formatRoleSummary(profile) {
+  const roleIdentifiers = getAssignedRoleIdentifiers(profile)
+  if (!roleIdentifiers.length) {
+    return translateOrFallback('admin.noRoles', 'No explicit roles')
+  }
+
+  return roleIdentifiers.map(getRoleDisplayLabel).join(', ')
+}
+
 function formatRole(profile) {
-  return profile?.is_admin
-    ? translateOrFallback('user.roleAdmin', 'Administrator')
-    : translateOrFallback('user.roleUser', 'User')
+  return formatRoleSummary(profile)
 }
 
 function formatCompactRole(profile) {
-  return profile?.is_admin
-    ? translateOrFallback('admin.roleAdmin', 'Admin')
-    : translateOrFallback('admin.roleUser', 'User')
+  return formatRoleSummary(profile)
 }
 
 function formatCompactAuthType(authType) {
@@ -357,7 +413,7 @@ function formatDate(value) {
 }
 
 function buildProfileBio(profile) {
-  if (profile?.is_admin) {
+  if (getAssignedRoleIdentifiers(profile).includes('admin')) {
     return translateOrFallback(
       'account.profileBioAdmin',
       'This workspace profile oversees administrative access, approval identity, and visibility across AtlasClaw operations.'
@@ -802,7 +858,7 @@ export async function mount(container, { params, route } = {}) {
   if (!document.getElementById('account-settings-page-css')) {
     const cssLink = document.createElement('link')
     cssLink.rel = 'stylesheet'
-    cssLink.href = '/styles/account-settings.css'
+    cssLink.href = buildAssetUrl('/styles/account-settings.css')
     cssLink.id = 'account-settings-page-css'
     document.head.appendChild(cssLink)
   }
@@ -853,6 +909,7 @@ function notifyProfileUpdated(profile) {
       email: profile?.email || '',
       avatar_url: profile?.avatar_url || '',
       auth_type: profile?.auth_type || '',
+      roles: profile?.roles || {},
       is_admin: profile?.is_admin === true,
       is_active: profile?.is_active !== false
     }

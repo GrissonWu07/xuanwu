@@ -46,6 +46,7 @@ export function createStreamHandler(runId, callbacks = {}) {
         onThinkingDelta = () => {},
         onThinkingEnd = () => {},
         onRuntime = () => {},
+        onHeartbeat = () => {},
         onEnd = () => {},
         onError = () => {}
     } = callbacks;
@@ -118,8 +119,10 @@ export function createStreamHandler(runId, callbacks = {}) {
             close();
         });
 
-        eventSource.addEventListener(EventTypes.HEARTBEAT, () => {
+        eventSource.addEventListener(EventTypes.HEARTBEAT, (e) => {
+            const data = parseEventData(e.data);
             console.log('[Stream] Heartbeat received');
+            onHeartbeat(data);
         });
 
         eventSource.addEventListener(EventTypes.THINKING, (e) => {
